@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kasir Toko Kelontong</title>
+    <link rel="stylesheet" href="styletoko.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header Kasir -->
+        <header class="header">
+            <div class="store-info">
+                <h1><i class="fas fa-store"></i> TOKO KELONTONG PURWANTO</h1>
+                <p id="current-date-time"></p>
+            </div>
+            <div class="kasir-info">
+                <h2><i class="fas fa-cash-register"></i> KASIR</h2>
+                <p>Kasir: <span id="kasir-name">ADMIN</span></p>
+            </div>
+        </header>
+
+        <!-- Mode Penjualan -->
+        <section class="selling-mode">
+            <h3><i class="fas fa-shopping-cart"></i> Mode Penjualan</h3>
+            <div class="mode-buttons">
+                <button id="ecer-btn" class="mode-btn active">
+                    <i class="fas fa-user"></i> ECER
+                </button>
+                <button id="grosir-btn" class="mode-btn">
+                    <i class="fas fa-users"></i> GROSIR
+                </button>
+            </div>
+            <p class="mode-info">
+                Mode: <span id="current-mode">Ecer</span> |
+                Harga: <span id="price-type">Harga Ecer</span>
+            </p>
+        </section>
+
+        <!-- Pencarian dan Daftar Barang -->
+        <section class="product-section">
+            <h3><i class="fas fa-boxes"></i> Daftar Barang</h3>
+            
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Cari nama barang..." 
+                       onkeyup="searchProducts()">
+                <button onclick="searchProducts()"><i class="fas fa-search"></i></button>
+            </div>
+            
+            <div class="product-list" id="product-list">
+                <!-- Daftar barang akan diisi oleh JavaScript -->
+            </div>
+        </section>
+
+        <!-- Input Transaksi -->
+        <section class="transaction-input">
+            <h3><i class="fas fa-edit"></i> Input Transaksi</h3>
+            <div class="input-group">
+                <label for="selected-product">Barang Terpilih:</label>
+                <input type="text" id="selected-product" readonly>
+            </div>
+            
+            <div class="input-group">
+                <label for="quantity">Jumlah:</label>
+                <input type="number" id="quantity" min="0.1" step="0.1" value="1" 
+                       onchange="calculateItemTotal()">
+                <span id="unit-display">pcs</span>
+            </div>
+            
+            <div class="input-group">
+                <label>Harga Satuan:</label>
+                <span id="unit-price">0</span>
+            </div>
+            
+            <div class="input-group total-input">
+                <label>Total Harga Barang:</label>
+                <span id="item-total">0</span>
+            </div>
+            
+            <div class="action-buttons">
+                <button onclick="addToCart()" class="btn-add">
+                    <i class="fas fa-cart-plus"></i> Tambah ke Keranjang
+                </button>
+                <button onclick="clearInput()" class="btn-clear">
+                    <i class="fas fa-times"></i> Reset
+                </button>
+            </div>
+        </section>
+
+        <!-- Keranjang Belanja -->
+        <section class="cart-section">
+            <h3><i class="fas fa-shopping-basket"></i> Keranjang Belanja</h3>
+            <div class="cart-table-container">
+                <table id="cart-table">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Nama Barang</th>
+                            <th>Jumlah</th>
+                            <th>Harga</th>
+                            <th>Total</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cart-items">
+                        <!-- Item keranjang akan diisi oleh JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="cart-summary">
+                <div class="summary-row">
+                    <span>Subtotal:</span>
+                    <span id="subtotal">0</span>
+                </div>
+                <div class="summary-row">
+                    <span>Diskon:</span>
+                    <span id="discount">0</span>
+                </div>
+                <div class="summary-row grand-total">
+                    <span><strong>TOTAL:</strong></span>
+                    <span id="grand-total"><strong>0</strong></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pembayaran dan Cetak -->
+        <section class="payment-section">
+            <h3><i class="fas fa-money-bill-wave"></i> Pembayaran</h3>
+            
+            <div class="input-group">
+                <label for="cash-paid">Uang Diberikan:</label>
+                <input type="number" id="cash-paid" min="0" value="0" 
+                       onchange="calculateChange()">
+            </div>
+            
+            <div class="input-group">
+                <label>Kembalian:</label>
+                <span id="change-amount">0</span>
+            </div>
+            
+            <div class="payment-buttons">
+                <button onclick="processPayment()" class="btn-pay">
+                    <i class="fas fa-check-circle"></i> PROSES PEMBAYARAN
+                </button>
+                <button onclick="printReceipt()" class="btn-print">
+                    <i class="fas fa-print"></i> CETAK NOTA
+                </button>
+                <button onclick="newTransaction()" class="btn-new">
+                    <i class="fas fa-receipt"></i> TRANSAKSI BARU
+                </button>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>© 2024 Kasir Toko Kelontong - Versi 1.0</p>
+            <p>Berjalan Offline | Total Transaksi: <span id="transaction-count">0</span></p>
+        </footer>
+    </div>
+
+    <!-- Receipt Popup (Sembunyi) -->
+    <div id="receipt-popup" class="receipt-popup">
+        <div class="receipt-content">
+            <button class="close-receipt" onclick="closeReceipt()">&times;</button>
+            <div id="receipt-content">
+                <!-- Konten nota akan diisi oleh JavaScript -->
+            </div>
+            <button onclick="printReceipt()" class="btn-print-receipt">
+                <i class="fas fa-print"></i> CETAK KE PRINTER
+            </button>
+        </div>
+    </div>
+
+    <script src="interaksi.js"></script>
+</body>
+</html>
