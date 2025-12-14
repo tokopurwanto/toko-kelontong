@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kasir Toko Kelontong</title>
+    <link rel="stylesheet" href="styletoko.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header Kasir -->
+        <header class="header">
+            <div class="store-info">
+                <h1><i class="fas fa-store"></i> TOKO KELONTONG PURWANTO</h1>
+                <p id="current-date-time"></p>
+            </div>
+            <div class="kasir-info">
+                <h2><i class="fas fa-cash-register"></i> KASIR</h2>
+                <p>Kasir: <span id="kasir-name">admin
+                </span></p>
+                <button class="btn-manage" onclick="openProductManager()">
+                    <i class="fas fa-cog"></i> Kelola Barang
+                </button>
+            </div>
+        </header>
+
+        <!-- Mode Penjualan -->
+        <section class="selling-mode">
+            <h3><i class="fas fa-shopping-cart"></i> Mode Penjualan</h3>
+            <div class="mode-buttons">
+                <button id="ecer-btn" class="mode-btn active">
+                    <i class="fas fa-user"></i> ECER
+                </button>
+                <button id="grosir-btn" class="mode-btn">
+                    <i class="fas fa-users"></i> GROSIR
+                </button>
+            </div>
+            <p class="mode-info">
+                Mode: <span id="current-mode">Ecer</span> |
+                Harga: <span id="price-type">Harga Ecer</span>
+            </p>
+        </section>
+
+        <!-- Pencarian dan Daftar Barang -->
+        <section class="product-section">
+            <h3><i class="fas fa-boxes"></i> Daftar Barang 
+                <small>(Total: <span id="product-count">10</span> barang)</small>
+            </h3>
+            
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Cari nama barang atau kategori..." 
+                       onkeyup="searchProducts()">
+                <button onclick="searchProducts()"><i class="fas fa-search"></i></button>
+                <button onclick="clearSearch()" class="btn-clear-search">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="product-list" id="product-list">
+                <!-- Daftar barang akan diisi oleh JavaScript -->
+            </div>
+            
+            <div class="product-actions">
+                <button onclick="openAddProductForm()" class="btn-action btn-add">
+                    <i class="fas fa-plus-circle"></i> Tambah Barang Baru
+                </button>
+            </div>
+        </section>
+
+        <!-- Input Transaksi -->
+        <section class="transaction-input">
+            <h3><i class="fas fa-edit"></i> Input Transaksi</h3>
+            <div class="input-group">
+                <label for="selected-product">Barang Terpilih:</label>
+                <input type="text" id="selected-product" readonly>
+            </div>
+            
+            <div class="input-group">
+                <label for="quantity">Jumlah:</label>
+                <input type="number" id="quantity" min="0.1" step="0.1" value="1" 
+                       onchange="calculateItemTotal()">
+                <span id="unit-display">pcs</span>
+            </div>
+            
+            <div class="input-group">
+                <label>Harga Satuan:</label>
+                <span id="unit-price">0</span>
+            </div>
+            
+            <div class="input-group total-input">
+                <label>Total Harga Barang:</label>
+                <span id="item-total">0</span>
+            </div>
+            
+            <div class="action-buttons">
+                <button onclick="addToCart()" class="btn-add">
+                    <i class="fas fa-cart-plus"></i> Tambah ke Keranjang
+                </button>
+                <button onclick="clearInput()" class="btn-clear">
+                    <i class="fas fa-times"></i> Reset
+                </button>
+            </div>
+        </section>
+
+        <!-- Keranjang Belanja -->
+        <section class="cart-section">
+            <h3><i class="fas fa-shopping-basket"></i> Keranjang Belanja 
+                <small>(<span id="cart-count">0</span> item)</small>
+            </h3>
+            <div class="cart-table-container">
+                <table id="cart-table">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>Nama Barang</th>
+                            <th>Jumlah</th>
+                            <th>Harga</th>
+                            <th>Total</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cart-items">
+                        <!-- Item keranjang akan diisi oleh JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="cart-summary">
+                <div class="summary-row">
+                    <span>Subtotal:</span>
+                    <span id="subtotal">0</span>
+                </div>
+                <div class="summary-row">
+                    <span>Diskon:</span>
+                    <span id="discount">0</span>
+                </div>
+                <div class="summary-row grand-total">
+                    <span><strong>TOTAL:</strong></span>
+                    <span id="grand-total"><strong>0</strong></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pembayaran dan Cetak -->
+        <section class="payment-section">
+            <h3><i class="fas fa-money-bill-wave"></i> Pembayaran</h3>
+            
+            <div class="input-group">
+                <label for="cash-paid">Uang Diberikan:</label>
+                <input type="number" id="cash-paid" min="0" value="0" 
+                       onchange="calculateChange()">
+            </div>
+            
+            <div class="input-group">
+                <label>Kembalian:</label>
+                <span id="change-amount">0</span>
+            </div>
+            
+            <div class="payment-buttons">
+                <button onclick="processPayment()" class="btn-pay">
+                    <i class="fas fa-check-circle"></i> PROSES PEMBAYARAN
+                </button>
+                <button onclick="printReceipt()" class="btn-print">
+                    <i class="fas fa-print"></i> CETAK NOTA
+                </button>
+                <button onclick="newTransaction()" class="btn-new">
+                    <i class="fas fa-receipt"></i> TRANSAKSI BARU
+                </button>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>© 2024 Kasir Toko Kelontong - Versi 2.0</p>
+            <p>Berjalan Offline | Total Transaksi: <span id="transaction-count">0</span></p>
+        </footer>
+    </div>
+
+    <!-- ===================== MODAL DAN POPUP ===================== -->
+
+    <!-- Modal Tambah/Edit Barang -->
+    <div id="product-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Tambah Barang Baru</h2>
+                <button class="close-modal" onclick="closeProductModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="product-form">
+                    <input type="hidden" id="product-id">
+                    
+                    <div class="form-group">
+                        <label for="product-name">Nama Barang *</label>
+                        <input type="text" id="product-name" required 
+                               placeholder="Contoh: Beras Premium">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="product-unit">Satuan *</label>
+                            <select id="product-unit" required>
+                                <option value="">Pilih Satuan</option>
+                                <option value="pcs">pcs</option>
+                                <option value="kg">kg</option>
+                                <option value="gram">gram</option>
+                                <option value="liter">liter</option>
+                                <option value="ml">ml</option>
+                                <option value="bungkus">bungkus</option>
+                                <option value="sachet">sachet</option>
+                                <option value="renceng">renceng</option>
+                                <option value="pack">pack</option>
+                                <option value="dus">dus</option>
+                                <option value="kaleng">kaleng</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="product-category">Kategori *</label>
+                            <select id="product-category" required>
+                                <option value="">Pilih Kategori</option>
+                                <option value="Sembako">Sembako</option>
+                                <option value="Makanan">Makanan</option>
+                                <option value="Minuman">Minuman</option>
+                                <option value="Kebersihan">Kebersihan</option>
+                                <option value="Rokok">Rokok</option>
+                                <option value="Alat Tulis">Alat Tulis</option>
+                                <option value="Elektronik">Elektronik</option>
+                                <option value="Perlengkapan">Perlengkapan</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="price-ecer">Harga Ecer *</label>
+                            <input type="number" id="price-ecer" required 
+                                   min="1" placeholder="Contoh: 12000">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="price-grosir">Harga Grosir *</label>
+                            <input type="number" id="price-grosir" required 
+                                   min="1" placeholder="Contoh: 11000">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="product-stock">Stok Awal (opsional)</label>
+                        <input type="number" id="product-stock" 
+                               min="0" placeholder="Kosongkan jika tidak ada stok">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="product-barcode">Kode Barang/Barcode (opsional)</label>
+                        <input type="text" id="product-barcode" 
+                               placeholder="Contoh: BRG001">
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn-cancel" 
+                                onclick="closeProductModal()">Batal</button>
+                        <button type="submit" class="btn-save">Simpan Barang</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Konfirmasi Hapus -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content confirm-modal">
+            <div class="modal-body">
+                <h3><i class="fas fa-exclamation-triangle"></i> Konfirmasi Hapus</h3>
+                <p id="confirm-message">Apakah Anda yakin ingin menghapus barang ini?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeConfirmModal()">Batal</button>
+                <button class="btn-delete" onclick="confirmDelete()">Ya, Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Kelola Barang (Product Manager) -->
+    <div id="manager-modal" class="modal">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-boxes"></i> Kelola Data Barang</h2>
+                <button class="close-modal" onclick="closeManagerModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="manager-actions">
+                    <button onclick="openAddProductForm()" class="btn-manager">
+                        <i class="fas fa-plus"></i> Tambah Barang
+                    </button>
+                    <button onclick="exportProducts()" class="btn-manager">
+                        <i class="fas fa-download"></i> Export Data
+                    </button>
+                    <button onclick="importProducts()" class="btn-manager">
+                        <i class="fas fa-upload"></i> Import Data
+                    </button>
+                    <button onclick="showAllProducts()" class="btn-manager">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+                
+                <div class="manager-search">
+                    <input type="text" id="manager-search" 
+                           placeholder="Cari barang..." onkeyup="searchInManager()">
+                </div>
+                
+                <div class="product-table-container">
+                    <table class="manager-table">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Nama Barang</th>
+                                <th>Kategori</th>
+                                <th>Satuan</th>
+                                <th>Harga Ecer</th>
+                                <th>Harga Grosir</th>
+                                <th>Stok</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="manager-table-body">
+                            <!-- Data akan diisi oleh JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="manager-summary">
+                    <p>Total Barang: <span id="total-products">0</span> | 
+                       Total Kategori: <span id="total-categories">0</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Popup -->
+    <div id="receipt-popup" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Struk Pembayaran</h2>
+                <button class="close-modal" onclick="closeReceipt()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="receipt-content">
+                    <!-- Konten nota akan diisi oleh JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="printReceipt()" class="btn-print-receipt">
+                    <i class="fas fa-print"></i> CETAK KE PRINTER
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Import Data -->
+    <input type="file" id="import-file" style="display: none;" 
+           accept=".json,.txt" onchange="handleFileImport(this)">
+
+    <script src="interaksi.js"></script>
+</body>
+</html>
