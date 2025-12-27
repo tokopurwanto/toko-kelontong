@@ -3,284 +3,309 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TOKO KELONTONG PURWANTO - Sistem Kasir Modern</title>
-    <link rel="stylesheet" href="styletoko.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>LENSA KASIR - Toko Kelontong</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #64748b;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --light: #f8fafc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e2e8f0;
+            margin: 0;
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 2px solid var(--primary);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+
+        h1 { color: var(--primary); font-size: 1.5rem; margin: 0; }
+
+        /* Tabel Barang */
+        .section-title { font-weight: bold; margin-bottom: 10px; display: block; }
+        .table-container { overflow-x: auto; margin-bottom: 25px; border: 1px solid #ddd; border-radius: 8px; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+        th { background: var(--light); color: var(--secondary); }
+
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+        }
+        .btn-add { background: var(--primary); }
+        .btn-del { background: var(--danger); }
+        .btn-print { background: #1e293b; width: 100%; margin-top: 15px; font-size: 1.1rem; }
+        .btn-reset { background: var(--secondary); width: 100%; margin-top: 5px; }
+
+        /* Modal Input */
+        #qtyModal {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            border-radius: 10px;
+            z-index: 1000;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .total-area {
+            background: #f1f5f9;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: right;
+            margin-top: 15px;
+        }
+
+        #totalBayar { font-size: 1.5rem; color: var(--primary); font-weight: 800; }
+
+        /* Format Struk */
+        #receipt-area { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-print, #receipt-print * { visibility: visible; }
+            #receipt-print { position: absolute; left: 0; top: 0; width: 58mm; font-family: 'Courier New', Courier, monospace; font-size: 10pt; }
+        }
+    </style>
 </head>
 <body>
-    <!-- Container Loading -->
-    <div id="loading" class="loading-container">
-        <div class="loading-spinner"></div>
-        <p>Memuat aplikasi...</p>
+
+<div class="container">
+    <header>
+        <h1>LENSA KASIR</h1>
+        <small>Toko Kelontong Grosir & Eceran</small>
+    </header>
+
+    <span class="section-title">📦 Stok Barang</span>
+    <div class="table-container">
+        <table id="stokTable">
+            <thead>
+                <tr>
+                    <th>Nama</th>
+                    <th>Grosir</th>
+                    <th>Ecer</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody id="product-list">
+                <tr><td colspan="4" style="text-align:center">Memuat data...</td></tr>
+            </tbody>
+        </table>
     </div>
 
-    <!-- Container Utama -->
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1><i class="fas fa-store"></i> TOKO KELONTONG PURWANTO</h1>
-            <div class="subtitle">Sistem Kasir Modern dengan Database Cloud</div>
-            <button class="btn-manage" onclick="openProductManager()">
-                <i class="fas fa-boxes"></i> Kelola Produk
-            </button>
-        </div>
-
-        <!-- Konten Utama -->
-        <div class="content">
-            <!-- Panel Kiri: Daftar Barang -->
-            <div class="left-panel">
-                <h2 class="section-title"><i class="fas fa-list"></i> Daftar Barang</h2>
-                
-                <div class="search-box">
-                    <span class="search-icon"><i class="fas fa-search"></i></span>
-                    <input type="text" id="searchInput" placeholder="Cari barang...">
-                    <button class="btn-clear-search" onclick="clearSearch()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-
-                <!-- Mode Penjualan -->
-                <section class="selling-mode">
-                    <h3><i class="fas fa-shopping-cart"></i> Mode Penjualan</h3>
-                    <div class="mode-buttons">
-                        <button id="ecer-btn" class="mode-btn active">
-                            <i class="fas fa-user"></i> ECER
-                        </button>
-                        <button id="grosir-btn" class="mode-btn">
-                            <i class="fas fa-users"></i> GROSIR
-                        </button>
-                    </div>
-                    <p class="mode-info">
-                        Mode: <span id="current-mode">Ecer</span> |
-                        Harga: <span id="price-type">Harga Ecer</span>
-                    </p>
-                </section>
-
-                <div class="product-grid" id="productGrid">
-                    <!-- Produk akan diisi oleh JavaScript -->
-                </div>
-            </div>
-
-            <!-- Panel Kanan: Transaksi -->
-            <div class="right-panel">
-                <!-- Tanggal & Waktu -->
-                <div class="datetime-display">
-                    <div class="date" id="currentDate">Minggu, 14 December 2025</div>
-                    <div class="time" id="currentTime">09:32:14</div>
-                </div>
-
-                <!-- Tabel Transaksi -->
-                <div class="transaction-table">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>No</th>
-                                <th>Nama Barang</th>
-                                <th>Qty</th>
-                                <th>Harga</th>
-                                <th>Total</th>
-                                <th>Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="transactionTable">
-                            <!-- Transaksi akan diisi oleh JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Panel Pembayaran -->
-                <div class="payment-panel">
-                    <h2 class="section-title"><i class="fas fa-cash-register"></i> Pembayaran</h2>
-                    
-                    <div class="payment-row">
-                        <span>Subtotal:</span>
-                        <span class="price-display" id="subtotal">Rp 0</span>
-                    </div>
-                    
-                    <div class="payment-row">
-                        <span>Pajak (10%):</span>
-                        <span class="price-display" id="tax">Rp 0</span>
-                    </div>
-                    
-                    <div class="payment-row total">
-                        <span>TOTAL:</span>
-                        <span id="total">Rp 0</span>
-                    </div>
-
-                    <div class="payment-input">
-                        <label for="cashInput">
-                            <i class="fas fa-money-bill-wave"></i> Uang Diberikan:
-                        </label>
-                        <input type="number" id="cashInput" placeholder="Masukkan jumlah uang" min="0">
-                    </div>
-
-                    <div class="change-display" id="changeDisplay">
-                        <i class="fas fa-exchange-alt"></i> Kembalian: Rp 0
-                    </div>
-
-                    <div class="action-buttons">
-                        <button class="btn btn-primary" onclick="processPayment()">
-                            <i class="fas fa-check-circle"></i> PROSES PEMBAYARAN
-                        </button>
-                        <button class="btn btn-secondary" onclick="resetTransaction()">
-                            <i class="fas fa-redo"></i> RESET TRANSAKSI
-                        </button>
-                        <button class="btn btn-success" onclick="openReceiptModal()">
-                            <i class="fas fa-receipt"></i> CETAK STRUK
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <span class="section-title">🛒 Nota Transaksi</span>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Tipe</th>
+                    <th>Qty</th>
+                    <th>Subtotal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="cart-list">
+                </tbody>
+        </table>
     </div>
 
-    <!-- Modal Manager Produk -->
-    <div id="productManagerModal" class="modal">
-        <div class="modal-content large-modal">
-            <div class="modal-header">
-                <h2><i class="fas fa-boxes"></i> Manajemen Produk</h2>
-                <button class="close-modal" onclick="closeProductManager()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="manager-actions">
-                    <button class="btn-manager" onclick="showAddProductForm()">
-                        <i class="fas fa-plus"></i> Tambah Produk Baru
-                    </button>
-                    <button class="btn-manager" onclick="exportProducts()">
-                        <i class="fas fa-file-export"></i> Export Data
-                    </button>
-                    <button class="btn-manager" onclick="importProducts()">
-                        <i class="fas fa-file-import"></i> Import Data
-                    </button>
-                </div>
-
-                <div class="manager-search">
-                    <input type="text" id="managerSearch" placeholder="Cari produk..." oninput="searchManagerProducts()">
-                </div>
-
-                <div class="product-table-container">
-                    <table class="manager-table">
-                        <thead>
-                            <tr>
-                                <th>Kode</th>
-                                <th>Nama Produk</th>
-                                <th>Harga Ecer</th>
-                                <th>Harga Grosir</th>
-                                <th>Stok</th>
-                                <th>Kategori</th>
-                                <th>Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="managerTable">
-                            <!-- Data produk akan diisi -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="manager-summary">
-                    Total Produk: <span id="productCount">0</span> | 
-                    Total Stok: <span id="totalStock">0</span>
-                </div>
-
-                <!-- Form Tambah/Edit Produk -->
-                <div id="productForm" style="display: none;">
-                    <h3><i class="fas fa-edit"></i> Form Produk</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="productCode">Kode Produk *</label>
-                            <input type="text" id="productCode" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="productName">Nama Produk *</label>
-                            <input type="text" id="productName" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="retailPrice">Harga Ecer *</label>
-                            <input type="number" id="retailPrice" required min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="wholesalePrice">Harga Grosir *</label>
-                            <input type="number" id="wholesalePrice" required min="0">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="stock">Stok *</label>
-                            <input type="number" id="stock" required min="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="category">Kategori</label>
-                            <select id="category">
-                                <option value="Makanan">Makanan</option>
-                                <option value="Minuman">Minuman</option>
-                                <option value="Sembako">Sembako</option>
-                                <option value="ATK">ATK</option>
-                                <option value="Lainnya">Lainnya</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="description">Deskripsi</label>
-                            <textarea id="description" rows="3"></textarea>
-                        </div>
-                    </div>
-                    <input type="hidden" id="editProductId">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-modal btn-cancel" onclick="cancelProductForm()">
-                    <i class="fas fa-times"></i> Batal
-                </button>
-                <button class="btn-modal btn-save" onclick="saveProduct()">
-                    <i class="fas fa-save"></i> Simpan
-                </button>
-            </div>
-        </div>
+    <div class="total-area">
+        <span>TOTAL BAYAR:</span><br>
+        <span id="totalBayar">Rp 0</span>
     </div>
 
-    <!-- Modal Struk -->
-    <div id="receiptModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-receipt"></i> Struk Pembayaran</h2>
-                <button class="close-modal" onclick="closeReceiptModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="receipt-content">
-                    <!-- Struk akan diisi oleh JavaScript -->
-                </div>
-                <button class="btn-print-receipt" onclick="printReceipt()">
-                    <i class="fas fa-print"></i> Cetak Struk
-                </button>
-            </div>
-        </div>
-    </div>
+    <button class="btn btn-print" onclick="printThermal()">🖨️ CETAK STRUK (58mm)</button>
+    <button class="btn btn-reset" onclick="resetCart()">🔄 Reset Transaksi</button>
+</div>
 
-    <!-- Modal Konfirmasi -->
-    <div id="confirmModal" class="modal">
-        <div class="modal-content confirm-modal">
-            <div class="modal-body">
-                <i class="fas fa-question-circle"></i>
-                <h3 id="confirmTitle">Konfirmasi</h3>
-                <p id="confirmMessage">Apakah Anda yakin?</p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-modal btn-cancel" onclick="confirmAction(false)">
-                    <i class="fas fa-times"></i> Tidak
-                </button>
-                <button class="btn-modal btn-save" onclick="confirmAction(true)">
-                    <i class="fas fa-check"></i> Ya
-                </button>
-            </div>
-        </div>
-    </div>
+<div class="overlay" id="overlay"></div>
+<div id="qtyModal">
+    <h3 id="modalTitle">Tambah Barang</h3>
+    <label>Tipe Harga:</label><br>
+    <select id="priceType" style="width: 100%; padding: 8px; margin: 10px 0;">
+        <option value="eceran">Eceran</option>
+        <option value="grosir">Grosir</option>
+    </select>
+    <label>Jumlah (Qty):</label>
+    <input type="number" id="inputQty" value="1" min="1" style="width: 93%; padding: 8px; margin: 10px 0;">
+    <button class="btn btn-add" style="width: 100%;" onclick="confirmAddToCart()">Tambahkan</button>
+    <button class="btn btn-reset" onclick="closeModal()">Batal</button>
+</div>
 
-    <!-- Script -->
-    <script src="interaksi.js"></script>
-    <script src="app.jsw"></script>
+<script>
+    // --- KONFIGURASI SUPABASE ---
+    const SUPABASE_URL = "https://aafacwvmzxzpyyxryuoc.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_ARHLAIm1BNBWUTGBqfX8zA_OYlZHB9-";
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let cart = [];
+    let selectedProduct = null;
+
+    // 1. Ambil Data Barang dari Supabase
+    async function fetchProducts() {
+        const { data, error } = await supabase
+            .from('products') // Ganti sesuai nama tabel Anda
+            .select('*')
+            .order('nama', { ascending: true });
+
+        if (error) {
+            console.error('Error:', error);
+            return;
+        }
+
+        const list = document.getElementById('product-list');
+        list.innerHTML = '';
+        data.forEach(p => {
+            list.innerHTML += `
+                <tr>
+                    <td>${p.nama} <br><small>${p.satuan}</small></td>
+                    <td>${p.harga_grosir.toLocaleString()}</td>
+                    <td>${p.harga_eceran.toLocaleString()}</td>
+                    <td><button class="btn btn-add" onclick="openModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">+</button></td>
+                </tr>
+            `;
+        });
+    }
+
+    // 2. Fungsi Modal
+    function openModal(product) {
+        selectedProduct = product;
+        document.getElementById('modalTitle').innerText = product.nama;
+        document.getElementById('qtyModal').style.display = 'block';
+        document.getElementById('overlay').style.display = 'block';
+    }
+
+    function closeModal() {
+        document.getElementById('qtyModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    // 3. Tambah ke Keranjang
+    function confirmAddToCart() {
+        const type = document.getElementById('priceType').value;
+        const qty = parseInt(document.getElementById('inputQty').value);
+        const harga = type === 'grosir' ? selectedProduct.harga_grosir : selectedProduct.harga_eceran;
+
+        const item = {
+            id: selectedProduct.id,
+            nama: selectedProduct.nama,
+            tipe: type,
+            qty: qty,
+            harga: harga,
+            subtotal: harga * qty
+        };
+
+        cart.push(item);
+        renderCart();
+        closeModal();
+    }
+
+    // 4. Update Tampilan Nota
+    function renderCart() {
+        const cartTable = document.getElementById('cart-list');
+        cartTable.innerHTML = '';
+        let total = 0;
+
+        cart.forEach((item, index) => {
+            total += item.subtotal;
+            cartTable.innerHTML += `
+                <tr>
+                    <td>${item.nama}</td>
+                    <td>${item.tipe}</td>
+                    <td>${item.qty}</td>
+                    <td>${item.subtotal.toLocaleString()}</td>
+                    <td><button class="btn btn-del" onclick="removeFromCart(${index})">x</button></td>
+                </tr>
+            `;
+        });
+
+        document.getElementById('totalBayar').innerText = 'Rp ' + total.toLocaleString();
+    }
+
+    function removeFromCart(index) {
+        cart.splice(index, 1);
+        renderCart();
+    }
+
+    function resetCart() {
+        if(confirm("Hapus semua transaksi?")) {
+            cart = [];
+            renderCart();
+        }
+    }
+
+    // 5. Fungsi Cetak Thermal (Format Teks)
+    function printThermal() {
+        if (cart.length === 0) return alert("Keranjang kosong!");
+
+        let now = new Date().toLocaleString('id-ID');
+        let total = cart.reduce((a, b) => a + b.subtotal, 0);
+
+        let printContent = `
+================================
+          LENSA KASIR
+================================
+Waktu: ${now}
+--------------------------------
+`;
+        cart.forEach(item => {
+            printContent += `${item.nama.padEnd(32)}\n`;
+            printContent += `${item.qty} x ${item.harga.toLocaleString().padStart(10)} | ${item.subtotal.toLocaleString().padStart(10)}\n`;
+        });
+
+        printContent += `--------------------------------
+TOTAL: Rp ${total.toLocaleString().padStart(15)}
+================================
+      Terima Kasih
+`;
+
+        // Membuka jendela cetak atau kirim ke printer Bluetooth via browser
+        const printWindow = window.open('', '', 'height=600,width=400');
+        printWindow.document.write('<pre>' + printContent + '</pre>');
+        printWindow.document.close();
+        printWindow.print();
+    }
+
+    // Jalankan saat load
+    fetchProducts();
+</script>
+
 </body>
 </html>
