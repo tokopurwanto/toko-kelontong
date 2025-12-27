@@ -3,226 +3,309 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LENSA KASIR - Central Database</title>
+    <title>LENSA KASIR - Toko Kelontong</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --primary: #2563eb; --danger: #ef4444; --success: #22c55e; --dark: #1e293b; }
-        body { font-family: sans-serif; background: #f1f5f9; margin: 0; padding: 10px; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 15px; border-radius: 8px; }
+        :root {
+            --primary: #2563eb;
+            --secondary: #64748b;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --light: #f8fafc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e2e8f0;
+            margin: 0;
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 2px solid var(--primary);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+
+        h1 { color: var(--primary); font-size: 1.5rem; margin: 0; }
+
+        /* Tabel Barang */
+        .section-title { font-weight: bold; margin-bottom: 10px; display: block; }
+        .table-container { overflow-x: auto; margin-bottom: 25px; border: 1px solid #ddd; border-radius: 8px; }
         
-        /* Login Admin Section */
-        .admin-bar { background: #334155; color: white; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        
-        /* UI Components */
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
-        th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; }
-        .hidden { display: none !important; }
-        .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+        th { background: var(--light); color: var(--secondary); }
+
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+        }
         .btn-add { background: var(--primary); }
-        .btn-danger { background: var(--danger); }
-        
-        /* Modal */
-        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; z-index:99; }
-        .modal { position: fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:8px; display:none; z-index:100; width:90%; max-width:400px; }
+        .btn-del { background: var(--danger); }
+        .btn-print { background: #1e293b; width: 100%; margin-top: 15px; font-size: 1.1rem; }
+        .btn-reset { background: var(--secondary); width: 100%; margin-top: 5px; }
+
+        /* Modal Input */
+        #qtyModal {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            border-radius: 10px;
+            z-index: 1000;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .total-area {
+            background: #f1f5f9;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: right;
+            margin-top: 15px;
+        }
+
+        #totalBayar { font-size: 1.5rem; color: var(--primary); font-weight: 800; }
+
+        /* Format Struk */
+        #receipt-area { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-print, #receipt-print * { visibility: visible; }
+            #receipt-print { position: absolute; left: 0; top: 0; width: 58mm; font-family: 'Courier New', Courier, monospace; font-size: 10pt; }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="admin-bar">
-        <span id="adminStatus">Mode: Kasir (View Only)</span>
-        <button id="btnLoginUI" class="btn" style="background: #475569;" onclick="showLogin()">Login Admin</button>
-        <button id="btnLogoutUI" class="btn btn-danger hidden" onclick="handleLogout()">Logout</button>
-    </div>
-
-    <header style="text-align:center; margin-bottom:20px;">
-        <h1 style="color:var(--primary); margin:0;">LENSA KASIR</h1>
-        <p>Database Terpusat - Toko Kelontong</p>
+    <header>
+        <h1>LENSA KASIR</h1>
+        <small>Toko Kelontong Grosir & Eceran</small>
     </header>
 
-    <div id="adminPanel" class="hidden" style="background: #f8fafc; padding: 15px; border: 1px dashed var(--primary); margin-bottom: 20px;">
-        <h3>🛠 Kelola Barang (Admin)</h3>
-        <input type="text" id="newNama" placeholder="Nama Barang">
-        <input type="number" id="newGrosir" placeholder="Harga Grosir">
-        <input type="number" id="newEcer" placeholder="Harga Eceran">
-        <input type="text" id="newSatuan" placeholder="Satuan (Pcs/Dus)">
-        <button class="btn btn-add" onclick="addProduct()">Simpan Barang</button>
-    </div>
-
-    <h3>📦 Daftar Barang</h3>
-    <div style="overflow-x:auto;">
-        <table>
+    <span class="section-title">📦 Stok Barang</span>
+    <div class="table-container">
+        <table id="stokTable">
             <thead>
                 <tr>
-                    <th>Barang</th>
+                    <th>Nama</th>
                     <th>Grosir</th>
                     <th>Ecer</th>
                     <th>Aksi</th>
                 </tr>
             </thead>
-            <tbody id="productList"></tbody>
+            <tbody id="product-list">
+                <tr><td colspan="4" style="text-align:center">Memuat data...</td></tr>
+            </tbody>
         </table>
     </div>
 
-    <hr>
-    <h3>🛒 Nota Transaksi</h3>
-    <table id="cartTable">
-        <thead><tr><th>Item</th><th>Qty</th><th>Subtotal</th><th></th></tr></thead>
-        <tbody id="cartList"></tbody>
-    </table>
-    <h2 id="totalBayar" style="text-align:right; color:var(--primary);">Total: Rp 0</h2>
-    <button class="btn" style="background:var(--dark); width:100%; padding:15px;" onclick="printThermal()">🖨️ CETAK STRUK</button>
+    <span class="section-title">🛒 Nota Transaksi</span>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Tipe</th>
+                    <th>Qty</th>
+                    <th>Subtotal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="cart-list">
+                </tbody>
+        </table>
+    </div>
+
+    <div class="total-area">
+        <span>TOTAL BAYAR:</span><br>
+        <span id="totalBayar">Rp 0</span>
+    </div>
+
+    <button class="btn btn-print" onclick="printThermal()">🖨️ CETAK STRUK (58mm)</button>
+    <button class="btn btn-reset" onclick="resetCart()">🔄 Reset Transaksi</button>
 </div>
 
 <div class="overlay" id="overlay"></div>
-<div class="modal" id="loginModal">
-    <h3>Login Admin</h3>
-    <input type="email" id="email" placeholder="Email" style="width:90%; margin-bottom:10px;"><br>
-    <input type="password" id="password" placeholder="Password" style="width:90%; margin-bottom:10px;"><br>
-    <button class="btn btn-add" onclick="handleLogin()">Masuk</button>
-    <button class="btn btn-danger" onclick="closeModal()">Batal</button>
-</div>
-
-<div class="modal" id="cartModal">
-    <h3 id="mProdName">Barang</h3>
-    <select id="mPriceType" style="width:100%; margin-bottom:10px;">
+<div id="qtyModal">
+    <h3 id="modalTitle">Tambah Barang</h3>
+    <label>Tipe Harga:</label><br>
+    <select id="priceType" style="width: 100%; padding: 8px; margin: 10px 0;">
         <option value="eceran">Eceran</option>
         <option value="grosir">Grosir</option>
     </select>
-    <input type="number" id="mQty" value="1" style="width:90%; margin-bottom:10px;">
-    <button class="btn btn-add" style="width:100%;" onclick="addToCart()">Tambah ke Nota</button>
+    <label>Jumlah (Qty):</label>
+    <input type="number" id="inputQty" value="1" min="1" style="width: 93%; padding: 8px; margin: 10px 0;">
+    <button class="btn btn-add" style="width: 100%;" onclick="confirmAddToCart()">Tambahkan</button>
+    <button class="btn btn-reset" onclick="closeModal()">Batal</button>
 </div>
 
 <script>
+    // --- KONFIGURASI SUPABASE ---
     const SUPABASE_URL = "https://aafacwvmzxzpyyxryuoc.supabase.co";
     const SUPABASE_KEY = "sb_publishable_ARHLAIm1BNBWUTGBqfX8zA_OYlZHB9-";
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let cart = [];
-    let tempProduct = null;
-    let isAdmin = false;
+    let selectedProduct = null;
 
-    // --- AUTH LOGIC ---
-    async function handleLogin() {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        
-        if (error) alert("Login Gagal: " + error.message);
-        else {
-            checkUser();
-            closeModal();
-        }
-    }
-
-    async function handleLogout() {
-        await supabase.auth.signOut();
-        checkUser();
-    }
-
-    async function checkUser() {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            isAdmin = true;
-            document.getElementById('adminStatus').innerText = "Mode: ADMIN (Full Access)";
-            document.getElementById('adminPanel').classList.remove('hidden');
-            document.getElementById('btnLoginUI').classList.add('hidden');
-            document.getElementById('btnLogoutUI').classList.remove('hidden');
-        } else {
-            isAdmin = false;
-            document.getElementById('adminStatus').innerText = "Mode: Kasir (View Only)";
-            document.getElementById('adminPanel').classList.add('hidden');
-            document.getElementById('btnLoginUI').classList.remove('hidden');
-            document.getElementById('btnLogoutUI').classList.add('hidden');
-        }
-        fetchProducts();
-    }
-
-    // --- PRODUCT LOGIC ---
+    // 1. Ambil Data Barang dari Supabase
     async function fetchProducts() {
-        const { data } = await supabase.from('products').select('*').order('nama');
-        const list = document.getElementById('productList');
+        const { data, error } = await supabase
+            .from('products') // Ganti sesuai nama tabel Anda
+            .select('*')
+            .order('nama', { ascending: true });
+
+        if (error) {
+            console.error('Error:', error);
+            return;
+        }
+
+        const list = document.getElementById('product-list');
         list.innerHTML = '';
         data.forEach(p => {
             list.innerHTML += `
                 <tr>
-                    <td>${p.nama}<br><small>${p.satuan}</small></td>
-                    <td>${p.harga_grosir}</td>
-                    <td>${p.harga_eceran}</td>
-                    <td>
-                        <button class="btn btn-add" onclick='openCartModal(${JSON.stringify(p)})'>+</button>
-                        ${isAdmin ? `<button class="btn btn-danger" onclick="deleteProduct(${p.id})">Hapus</button>` : ''}
-                    </td>
+                    <td>${p.nama} <br><small>${p.satuan}</small></td>
+                    <td>${p.harga_grosir.toLocaleString()}</td>
+                    <td>${p.harga_eceran.toLocaleString()}</td>
+                    <td><button class="btn btn-add" onclick="openModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">+</button></td>
                 </tr>
             `;
         });
     }
 
-    async function addProduct() {
-        const item = {
-            nama: document.getElementById('newNama').value,
-            harga_grosir: parseInt(document.getElementById('newGrosir').value),
-            harga_eceran: parseInt(document.getElementById('newEcer').value),
-            satuan: document.getElementById('newSatuan').value
-        };
-        const { error } = await supabase.from('products').insert([item]);
-        if (error) alert(error.message);
-        else fetchProducts();
-    }
-
-    async function deleteProduct(id) {
-        if(confirm("Hapus barang ini dari database pusat?")) {
-            await supabase.from('products').delete().eq('id', id);
-            fetchProducts();
-        }
-    }
-
-    // --- UI LOGIC ---
-    function showLogin() { 
-        document.getElementById('loginModal').style.display = 'block'; 
-        document.getElementById('overlay').style.display = 'block'; 
-    }
-    
-    function openCartModal(p) {
-        tempProduct = p;
-        document.getElementById('mProdName').innerText = p.nama;
-        document.getElementById('cartModal').style.display = 'block';
+    // 2. Fungsi Modal
+    function openModal(product) {
+        selectedProduct = product;
+        document.getElementById('modalTitle').innerText = product.nama;
+        document.getElementById('qtyModal').style.display = 'block';
         document.getElementById('overlay').style.display = 'block';
     }
 
     function closeModal() {
-        document.querySelectorAll('.modal, .overlay').forEach(el => el.style.display = 'none');
+        document.getElementById('qtyModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
     }
 
-    function addToCart() {
-        const type = document.getElementById('mPriceType').value;
-        const qty = parseInt(document.getElementById('mQty').value);
-        const price = type === 'grosir' ? tempProduct.harga_grosir : tempProduct.harga_eceran;
-        
-        cart.push({ nama: tempProduct.nama, qty, price, subtotal: qty * price });
+    // 3. Tambah ke Keranjang
+    function confirmAddToCart() {
+        const type = document.getElementById('priceType').value;
+        const qty = parseInt(document.getElementById('inputQty').value);
+        const harga = type === 'grosir' ? selectedProduct.harga_grosir : selectedProduct.harga_eceran;
+
+        const item = {
+            id: selectedProduct.id,
+            nama: selectedProduct.nama,
+            tipe: type,
+            qty: qty,
+            harga: harga,
+            subtotal: harga * qty
+        };
+
+        cart.push(item);
         renderCart();
         closeModal();
     }
 
+    // 4. Update Tampilan Nota
     function renderCart() {
-        const body = document.getElementById('cartList');
-        body.innerHTML = '';
+        const cartTable = document.getElementById('cart-list');
+        cartTable.innerHTML = '';
         let total = 0;
-        cart.forEach((item, i) => {
+
+        cart.forEach((item, index) => {
             total += item.subtotal;
-            body.innerHTML += `<tr><td>${item.nama}</td><td>${item.qty}</td><td>${item.subtotal}</td><td><button onclick="cart.splice(${i},1);renderCart()">x</button></td></tr>`;
+            cartTable.innerHTML += `
+                <tr>
+                    <td>${item.nama}</td>
+                    <td>${item.tipe}</td>
+                    <td>${item.qty}</td>
+                    <td>${item.subtotal.toLocaleString()}</td>
+                    <td><button class="btn btn-del" onclick="removeFromCart(${index})">x</button></td>
+                </tr>
+            `;
         });
-        document.getElementById('totalBayar').innerText = "Total: Rp " + total.toLocaleString();
+
+        document.getElementById('totalBayar').innerText = 'Rp ' + total.toLocaleString();
     }
 
+    function removeFromCart(index) {
+        cart.splice(index, 1);
+        renderCart();
+    }
+
+    function resetCart() {
+        if(confirm("Hapus semua transaksi?")) {
+            cart = [];
+            renderCart();
+        }
+    }
+
+    // 5. Fungsi Cetak Thermal (Format Teks)
     function printThermal() {
-        // Logika print sama seperti kode sebelumnya
-        window.print();
+        if (cart.length === 0) return alert("Keranjang kosong!");
+
+        let now = new Date().toLocaleString('id-ID');
+        let total = cart.reduce((a, b) => a + b.subtotal, 0);
+
+        let printContent = `
+================================
+          LENSA KASIR
+================================
+Waktu: ${now}
+--------------------------------
+`;
+        cart.forEach(item => {
+            printContent += `${item.nama.padEnd(32)}\n`;
+            printContent += `${item.qty} x ${item.harga.toLocaleString().padStart(10)} | ${item.subtotal.toLocaleString().padStart(10)}\n`;
+        });
+
+        printContent += `--------------------------------
+TOTAL: Rp ${total.toLocaleString().padStart(15)}
+================================
+      Terima Kasih
+`;
+
+        // Membuka jendela cetak atau kirim ke printer Bluetooth via browser
+        const printWindow = window.open('', '', 'height=600,width=400');
+        printWindow.document.write('<pre>' + printContent + '</pre>');
+        printWindow.document.close();
+        printWindow.print();
     }
 
-    // Init
-    checkUser();
+    // Jalankan saat load
+    fetchProducts();
 </script>
+
 </body>
 </html>
