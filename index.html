@@ -157,19 +157,19 @@
                 <h3 class="text-xl font-black text-slate-800">Formulir Barang</h3>
                 <button onclick="closeModal()" class="text-slate-300 hover:text-slate-600">✕</button>
             </div>
-            <form id="form-master" class="p-6 grid grid-cols-2 gap-4">
+            <form id="form-master" onsubmit="saveMasterBarang(event)" class="p-6 grid grid-cols-2 gap-4">
                 <input type="hidden" id="f-id">
                 <div class="col-span-2">
                     <label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Nama Produk</label>
                     <input type="text" id="f-nama" required class="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-400 outline-none transition">
                 </div>
                 <div><label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Stok</label><input type="number" id="f-stok" required class="w-full p-3 bg-slate-50 rounded-xl outline-none"></div>
-                <div><label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Satuan</label><input type="text" id="f-satuan" required class="w-full p-3 bg-slate-50 rounded-xl outline-none"></div>
+                <div><label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Satuan</label><input type="text" id="f-satuan" required class="w-full p-3 bg-slate-50 rounded-xl outline-none" placeholder="Pcs/Bks/Lusin"></div>
                 <div><label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Harga Ecer</label><input type="number" id="f-ecer" required class="w-full p-3 bg-slate-50 rounded-xl outline-none"></div>
                 <div><label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Harga Grosir</label><input type="number" id="f-grosir" required class="w-full p-3 bg-slate-50 rounded-xl outline-none"></div>
                 <div class="col-span-2 flex gap-4 mt-4">
                     <button type="button" onclick="closeModal()" class="flex-1 py-4 font-black text-slate-400 uppercase text-xs">Batal</button>
-                    <button type="submit" class="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg">Simpan</button>
+                    <button type="submit" class="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg">Simpan Data</button>
                 </div>
             </form>
         </div>
@@ -198,34 +198,130 @@
         let keranjang = [];
         let totalHarga = 0;
         let currentPriceMode = 'ecer';
-        
-        // Bluetooth Printer Variables
         let bluetoothCharacteristic = null;
 
+        // AUTH & INIT
+        async function initApp() {
+            if (!sessionToken) {
+                document.getElementById('view-login').classList.remove('hidden');
+                document.getElementById('view-main').classList.add('hidden');
+                return;
+            }
+            document.getElementById('view-login').classList.add('hidden');
+            document.getElementById('view-main').classList.remove('hidden');
+            const isAdmin = userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+            document.getElementById('user-display').innerText = userEmail;
+            if (isAdmin) document.getElementById('nav-stok').classList.remove('hidden');
+            
+            await fetchBarang();
+        }
+
+        async function fetchBarang() {
+            const res = await fetch(`${SB_URL}/rest/v1/barang?select=*&order=nama.asc`, { headers: getHeaders() });
+            masterBarang = await res.json();
+            renderProduk();
+            renderStok();
+        }
+
+        // LOGIKA MASTER BARANG (STOK)
+        function renderStok() {
+            const tbody = document.getElementById('table-stok-body');
+            if (!tbody) return;
+            tbody.innerHTML = "";
+            masterBarang.forEach(b => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-5">
+                            <p class="font-bold text-slate-800">${b.nama}</p>
+                            <p class="text-[9px] uppercase text-slate-400 font-black">${b.satuan}</p>
+                        </td>
+                        <td class="p-5 font-mono font-bold">${b.stok}</td>
+                        <td class="p-5 text-indigo-600 font-bold">Rp ${Number(b.harga_ecer).toLocaleString()}</td>
+                        <td class="p-5 text-amber-600 font-bold">Rp ${Number(b.harga_grosir).toLocaleString()}</td>
+                        <td class="p-5 text-center">
+                            <button onclick="editBarang(${b.id})" class="text-indigo-500 hover:text-indigo-700 mr-3">Edit</button>
+                            <button onclick="deleteBarang(${b.id})" class="text-red-400 hover:text-red-600">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function saveMasterBarang(e) {
+            e.preventDefault();
+            const id = document.getElementById('f-id').value;
+            const payload = {
+                nama: document.getElementById('f-nama').value,
+                stok: parseInt(document.getElementById('f-stok').value),
+                satuan: document.getElementById('f-satuan').value,
+                harga_ecer: parseInt(document.getElementById('f-ecer').value),
+                harga_grosir: parseInt(document.getElementById('f-grosir').value)
+            };
+
+            const method = id ? 'PATCH' : 'POST';
+            const url = id ? `${SB_URL}/rest/v1/barang?id=eq.${id}` : `${SB_URL}/rest/v1/barang`;
+
+            const res = await fetch(url, {
+                method: method,
+                headers: getHeaders(),
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                closeModal();
+                await fetchBarang();
+            } else {
+                alert("Gagal menyimpan data!");
+            }
+        }
+
+        function editBarang(id) {
+            const b = masterBarang.find(x => x.id === id);
+            document.getElementById('f-id').value = b.id;
+            document.getElementById('f-nama').value = b.nama;
+            document.getElementById('f-stok').value = b.stok;
+            document.getElementById('f-satuan').value = b.satuan;
+            document.getElementById('f-ecer').value = b.harga_ecer;
+            document.getElementById('f-grosir').value = b.harga_grosir;
+            openModal();
+        }
+
+        async function deleteBarang(id) {
+            if (!confirm("Hapus barang ini?")) return;
+            const res = await fetch(`${SB_URL}/rest/v1/barang?id=eq.${id}`, {
+                method: 'DELETE',
+                headers: getHeaders()
+            });
+            if (res.ok) await fetchBarang();
+        }
+
+        function openModal() { document.getElementById('modal-barang').classList.remove('hidden'); }
+        function closeModal() { 
+            document.getElementById('modal-barang').classList.add('hidden');
+            document.getElementById('form-master').reset();
+            document.getElementById('f-id').value = "";
+        }
+
+        // KASIR & BLUETOOTH (Existing functions)
         async function connectBluetooth() {
             try {
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }], // UUID standar printer thermal
+                    filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
                     optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
                 });
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
                 const characteristics = await service.getCharacteristics();
                 bluetoothCharacteristic = characteristics[0];
-                
                 document.getElementById('btn-connect-printer').innerText = "✅ BT Terhubung";
                 document.getElementById('btn-connect-printer').classList.replace('bg-emerald-500', 'bg-indigo-500');
-            } catch (err) {
-                console.error(err);
-                alert("Gagal terhubung ke Bluetooth Printer. Pastikan Bluetooth aktif.");
-            }
+            } catch (err) { alert("Bluetooth gagal terhubung."); }
         }
 
         async function sendToBluetooth(text) {
             if (!bluetoothCharacteristic) return false;
             const encoder = new TextEncoder();
-            const data = encoder.encode(text + "\n\n\n"); // Tambah feed kertas
-            await bluetoothCharacteristic.writeValue(data);
+            await bluetoothCharacteristic.writeValue(encoder.encode(text + "\n\n\n"));
             return true;
         }
 
@@ -250,40 +346,9 @@
         function handleLogout() { localStorage.clear(); location.reload(); }
         function getHeaders() { return { "apikey": SB_KEY, "Authorization": `Bearer ${sessionToken || SB_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation" }; }
 
-        async function initApp() {
-            if (!sessionToken) {
-                document.getElementById('view-login').classList.remove('hidden');
-                document.getElementById('view-main').classList.add('hidden');
-                return;
-            }
-            document.getElementById('view-login').classList.add('hidden');
-            document.getElementById('view-main').classList.remove('hidden');
-            const isAdmin = userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-            document.getElementById('user-display').innerText = userEmail;
-            if (isAdmin) document.getElementById('nav-stok').classList.remove('hidden');
-            
-            const res = await fetch(`${SB_URL}/rest/v1/barang?select=*&order=nama.asc`, { headers: getHeaders() });
-            masterBarang = await res.json();
-            renderProduk();
-            if (isAdmin) renderStok();
-        }
-
-        function setPriceMode(mode) {
-            currentPriceMode = mode;
-            const btnEcer = document.getElementById('mode-ecer');
-            const btnGrosir = document.getElementById('mode-grosir');
-            if (mode === 'ecer') {
-                btnEcer.className = "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all bg-white shadow-md text-indigo-600 border border-slate-100";
-                btnGrosir.className = "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all text-slate-400 hover:text-slate-600";
-            } else {
-                btnGrosir.className = "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all bg-white shadow-md text-amber-600 border border-slate-100";
-                btnEcer.className = "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all text-slate-400 hover:text-slate-600";
-            }
-            renderProduk(document.getElementById('search-box').value);
-        }
-
         function renderProduk(filter = "") {
             const container = document.getElementById('grid-produk');
+            if (!container) return;
             container.innerHTML = "";
             const filtered = masterBarang.filter(b => b.nama.toLowerCase().includes(filter.toLowerCase()));
             filtered.forEach(b => {
@@ -291,7 +356,7 @@
                 const hargaTampil = currentPriceMode === 'ecer' ? b.harga_ecer : b.harga_grosir;
                 const modeColor = currentPriceMode === 'ecer' ? 'text-indigo-600' : 'text-amber-600';
                 container.innerHTML += `
-                    <div onclick="${isOutOfStock ? '' : `addToCart(${b.id})`}" class="bg-white p-5 rounded-3xl shadow-sm border-2 border-transparent hover:border-indigo-600 cursor-pointer transition-all active:scale-95 group relative">
+                    <div onclick="${isOutOfStock ? '' : `addToCart(${b.id})`}" class="bg-white p-5 rounded-3xl shadow-sm border-2 border-transparent hover:border-indigo-600 cursor-pointer transition-all active:scale-95 group relative ${isOutOfStock ? 'opacity-50 grayscale' : ''}">
                         <p class="text-[9px] font-black text-slate-300 uppercase mb-1">${b.satuan}</p>
                         <h3 class="font-bold text-slate-800 truncate">${b.nama}</h3>
                         <p class="${modeColor} font-black text-lg">Rp ${Number(hargaTampil).toLocaleString()}</p>
@@ -336,13 +401,11 @@
 
         async function prosesTransaksi() {
             const bayar = document.getElementById('input-bayar').value;
-            if (keranjang.length === 0 || bayar < totalHarga) return alert("Cek input!");
-
+            if (keranjang.length === 0 || bayar < totalHarga) return alert("Cek saldo bayar!");
             try {
                 const res = await fetch(`${SB_URL}/rest/v1/transaksi`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ total: totalHarga }) });
                 const head = await res.json();
                 const tid = head[0].id;
-                
                 let rawText = "LENSA TOKO\n----------\n";
                 for (const item of keranjang) {
                     const h = item.tipe === 'grosir' ? item.harga_grosir : item.harga_ecer;
@@ -351,18 +414,11 @@
                     await fetch(`${SB_URL}/rest/v1/barang?id=eq.${item.id}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ stok: item.stok - item.qty }) });
                 }
                 rawText += `----------\nTOTAL: ${totalHarga}\nTUNAI: ${bayar}\nKEMBALI: ${bayar - totalHarga}\n\nTerima Kasih!`;
-
-                // Coba kirim ke Bluetooth dulu, jika tidak ada/gagal, gunakan window.print()
                 const btSuccess = await sendToBluetooth(rawText);
-                if (!btSuccess) {
-                    printReceiptLegacy(bayar);
-                }
-
+                if (!btSuccess) printReceiptLegacy(bayar);
                 clearCart();
-                initApp();
-            } catch (e) {
-                alert("Gagal memproses transaksi.");
-            }
+                await fetchBarang();
+            } catch (e) { alert("Gagal proses."); }
         }
 
         function printReceiptLegacy(bayar) {
@@ -384,10 +440,17 @@
             const s = (document.getElementById('input-bayar').value || 0) - totalHarga;
             document.getElementById('change-display').innerText = `Rp ${Math.abs(s).toLocaleString()}`;
         }
-
+        function setPriceMode(mode) {
+            currentPriceMode = mode;
+            document.getElementById('mode-ecer').className = mode === 'ecer' ? "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white shadow-md text-indigo-600 border border-slate-100" : "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600";
+            document.getElementById('mode-grosir').className = mode === 'grosir' ? "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white shadow-md text-amber-600 border border-slate-100" : "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600";
+            renderProduk();
+        }
         function switchTab(tab) {
             document.getElementById('section-kasir').classList.toggle('hidden', tab !== 'kasir');
             document.getElementById('section-stok').classList.toggle('hidden', tab !== 'stok');
+            document.getElementById('nav-kasir').className = tab === 'kasir' ? "active-tab pb-1" : "opacity-60 hover:opacity-100";
+            document.getElementById('nav-stok').className = tab === 'stok' ? "active-tab pb-1" : "opacity-60 hover:opacity-100";
         }
 
         window.onload = initApp;
