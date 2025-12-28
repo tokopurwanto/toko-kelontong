@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Lensa Toko - Kasir & Inventori</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Library untuk Scan Barcode via Kamera -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         @media print {
             body * { visibility: hidden; }
@@ -16,6 +18,15 @@
         }
         .active-tab { border-bottom: 3px solid white; opacity: 1; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        #reader, #reader-modal { width: 100%; border-radius: 1.5rem; overflow: hidden; border: none !important; }
+        
+        /* Animasi scanner line */
+        .scanner-placeholder {
+            position: relative;
+            background: #000;
+            border-radius: 1rem;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen font-sans text-slate-900">
@@ -56,7 +67,10 @@
                 </div>
                 <div class="flex items-center gap-4">
                     <button id="btn-connect-printer" onclick="connectBluetooth()" class="text-[9px] bg-emerald-500 hover:bg-emerald-600 px-3 py-2 rounded-xl font-black transition uppercase shadow-lg mr-2">
-                        🔌 Hubungkan Printer BT
+                        🔌 Printer BT
+                    </button>
+                    <button onclick="toggleScanner('main')" class="text-[9px] bg-amber-500 hover:bg-amber-600 px-3 py-2 rounded-xl font-black transition uppercase shadow-lg mr-2">
+                        📷 Scan Kasir
                     </button>
                     <div class="text-right hidden sm:block">
                         <p id="user-display" class="text-[10px] font-black uppercase tracking-tighter"></p>
@@ -67,24 +81,42 @@
         </header>
 
         <main class="container mx-auto p-4">
+            <!-- SCANNER CAMERA OVERLAY (KASIR) -->
+            <div id="scanner-container" class="hidden mb-6">
+                <div class="bg-white p-4 rounded-3xl shadow-xl border-2 border-amber-400">
+                    <div class="flex justify-between items-center mb-4 px-2">
+                        <h3 class="text-xs font-black uppercase text-amber-600">Pemindai Kasir Aktif</h3>
+                        <button onclick="toggleScanner('main')" class="text-slate-400 font-bold">Tutup ✕</button>
+                    </div>
+                    <div id="reader"></div>
+                </div>
+            </div>
+
             <!-- SECTION KASIR -->
             <section id="section-kasir" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2">
                     <div class="bg-white p-4 rounded-3xl shadow-sm border mb-4">
-                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div class="flex-1 flex items-center bg-slate-100 p-2 rounded-2xl gap-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Pencarian Nama -->
+                            <div class="flex items-center bg-slate-100 p-2 rounded-2xl gap-3">
                                 <div class="bg-white p-2 rounded-xl shadow-sm text-xl">🔍</div>
                                 <input type="text" id="search-box" onkeyup="filterItems()" placeholder="Cari nama barang..." class="w-full bg-transparent border-none outline-none text-sm font-bold text-slate-600">
                             </div>
-                            
-                            <div class="flex bg-slate-100 p-1.5 rounded-2xl w-full md:w-auto">
-                                <button onclick="setPriceMode('ecer')" id="mode-ecer" class="flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 bg-white shadow-md text-indigo-600 border border-slate-100">
-                                    👤 Eceran
-                                </button>
-                                <button onclick="setPriceMode('grosir')" id="mode-grosir" class="flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 text-slate-400 hover:text-slate-600">
-                                    📦 Grosir
-                                </button>
+
+                            <!-- Pencarian Barcode (Untuk Scanner Laser) -->
+                            <div class="flex items-center bg-slate-100 p-2 rounded-2xl gap-3 border-2 border-indigo-100">
+                                <div class="bg-white p-2 rounded-xl shadow-sm text-xl">🏷️</div>
+                                <input type="text" id="barcode-input" onkeypress="handleBarcodeEnter(event)" placeholder="Scan Barcode di sini..." class="w-full bg-transparent border-none outline-none text-sm font-bold text-slate-600">
                             </div>
+                        </div>
+                        
+                        <div class="flex bg-slate-100 p-1.5 rounded-2xl w-full mt-4">
+                            <button onclick="setPriceMode('ecer')" id="mode-ecer" class="flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 bg-white shadow-md text-indigo-600 border border-slate-100">
+                                👤 Eceran
+                            </button>
+                            <button onclick="setPriceMode('grosir')" id="mode-grosir" class="flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all duration-300 text-slate-400 hover:text-slate-600">
+                                📦 Grosir
+                            </button>
                         </div>
                     </div>
 
@@ -135,7 +167,7 @@
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                 <tr>
-                                    <th class="p-5">Barang</th>
+                                    <th class="p-5">Barang & Barcode</th>
                                     <th class="p-5">Stok</th>
                                     <th class="p-5">Ecer</th>
                                     <th class="p-5">Grosir</th>
@@ -163,6 +195,23 @@
                     <label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Nama Produk</label>
                     <input type="text" id="f-nama" required class="w-full p-3 bg-slate-50 rounded-xl border-2 border-transparent focus:border-indigo-400 outline-none transition">
                 </div>
+                
+                <div class="col-span-2">
+                    <label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Kode Barcode</label>
+                    <div class="flex items-center bg-slate-50 rounded-xl border-2 border-transparent focus-within:border-indigo-400 transition overflow-hidden">
+                        <input type="text" id="f-barcode" class="w-full p-3 bg-transparent outline-none" placeholder="Scan atau ketik kode barcode">
+                        <button type="button" onclick="toggleScanner('modal')" class="p-3 bg-slate-100 hover:bg-indigo-100 text-indigo-600 transition">
+                            📷
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scanner Area for Modal -->
+                <div id="modal-scanner-container" class="col-span-2 hidden bg-black rounded-2xl overflow-hidden mt-2 border-2 border-indigo-400">
+                    <div id="reader-modal"></div>
+                    <button type="button" onclick="toggleScanner('modal')" class="w-full py-2 bg-slate-800 text-white text-[10px] font-bold uppercase tracking-widest">Matikan Kamera</button>
+                </div>
+
                 <div><label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Stok</label><input type="number" id="f-stok" required class="w-full p-3 bg-slate-50 rounded-xl outline-none"></div>
                 <div><label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Satuan</label><input type="text" id="f-satuan" required class="w-full p-3 bg-slate-50 rounded-xl outline-none" placeholder="Pcs/Bks/Lusin"></div>
                 <div><label class="text-[10px] font-black uppercase text-slate-400 mb-1 block">Harga Ecer</label><input type="number" id="f-ecer" required class="w-full p-3 bg-slate-50 rounded-xl outline-none"></div>
@@ -199,6 +248,8 @@
         let totalHarga = 0;
         let currentPriceMode = 'ecer';
         let bluetoothCharacteristic = null;
+        let html5QrCodeMain = null;
+        let html5QrCodeModal = null;
 
         // AUTH & INIT
         async function initApp() {
@@ -223,6 +274,73 @@
             renderStok();
         }
 
+        // LOGIKA BARCODE SCANNER
+        function handleBarcodeEnter(e) {
+            if (e.key === 'Enter') {
+                const code = e.target.value;
+                if (code) {
+                    onScanSuccessMain(code);
+                    e.target.value = ""; 
+                }
+            }
+        }
+
+        function onScanSuccessMain(decodedText) {
+            const item = masterBarang.find(b => b.barcode === decodedText);
+            if (item) {
+                if (item.stok > 0) {
+                    addToCart(item.id);
+                    document.getElementById('barcode-input').style.borderColor = "#10b981";
+                    setTimeout(() => document.getElementById('barcode-input').style.borderColor = "", 500);
+                } else {
+                    alert(`Barang ${item.nama} stok kosong!`);
+                }
+            } else {
+                console.log("Barcode tidak terdaftar:", decodedText);
+            }
+        }
+
+        function onScanSuccessModal(decodedText) {
+            document.getElementById('f-barcode').value = decodedText;
+            toggleScanner('modal'); // Auto close after success
+            // Feedback visual
+            const inputContainer = document.getElementById('f-barcode').parentElement;
+            inputContainer.style.borderColor = "#10b981";
+            setTimeout(() => inputContainer.style.borderColor = "", 1000);
+        }
+
+        async function toggleScanner(type) {
+            if (type === 'main') {
+                const container = document.getElementById('scanner-container');
+                if (container.classList.contains('hidden')) {
+                    container.classList.remove('hidden');
+                    html5QrCodeMain = new Html5Qrcode("reader");
+                    const config = { fps: 15, qrbox: { width: 250, height: 150 } };
+                    await html5QrCodeMain.start({ facingMode: "environment" }, config, onScanSuccessMain);
+                } else {
+                    container.classList.add('hidden');
+                    if (html5QrCodeMain) {
+                        await html5QrCodeMain.stop();
+                        html5QrCodeMain = null;
+                    }
+                }
+            } else if (type === 'modal') {
+                const container = document.getElementById('modal-scanner-container');
+                if (container.classList.contains('hidden')) {
+                    container.classList.remove('hidden');
+                    html5QrCodeModal = new Html5Qrcode("reader-modal");
+                    const config = { fps: 15, qrbox: { width: 250, height: 150 } };
+                    await html5QrCodeModal.start({ facingMode: "environment" }, config, onScanSuccessModal);
+                } else {
+                    container.classList.add('hidden');
+                    if (html5QrCodeModal) {
+                        await html5QrCodeModal.stop();
+                        html5QrCodeModal = null;
+                    }
+                }
+            }
+        }
+
         // LOGIKA MASTER BARANG (STOK)
         function renderStok() {
             const tbody = document.getElementById('table-stok-body');
@@ -233,14 +351,17 @@
                     <tr class="hover:bg-slate-50 transition">
                         <td class="p-5">
                             <p class="font-bold text-slate-800">${b.nama}</p>
-                            <p class="text-[9px] uppercase text-slate-400 font-black">${b.satuan}</p>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[9px] uppercase text-slate-400 font-black">${b.satuan}</span>
+                                ${b.barcode ? `<span class="bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded text-[8px] font-bold tracking-tight">🆔 ${b.barcode}</span>` : ''}
+                            </div>
                         </td>
                         <td class="p-5 font-mono font-bold">${b.stok}</td>
                         <td class="p-5 text-indigo-600 font-bold">Rp ${Number(b.harga_ecer).toLocaleString()}</td>
                         <td class="p-5 text-amber-600 font-bold">Rp ${Number(b.harga_grosir).toLocaleString()}</td>
                         <td class="p-5 text-center">
-                            <button onclick="editBarang(${b.id})" class="text-indigo-500 hover:text-indigo-700 mr-3">Edit</button>
-                            <button onclick="deleteBarang(${b.id})" class="text-red-400 hover:text-red-600">Hapus</button>
+                            <button onclick="editBarang(${b.id})" class="text-indigo-500 hover:text-indigo-700 mr-3 font-bold text-xs">Edit</button>
+                            <button onclick="deleteBarang(${b.id})" class="text-red-400 hover:text-red-600 font-bold text-xs">Hapus</button>
                         </td>
                     </tr>
                 `;
@@ -252,6 +373,7 @@
             const id = document.getElementById('f-id').value;
             const payload = {
                 nama: document.getElementById('f-nama').value,
+                barcode: document.getElementById('f-barcode').value,
                 stok: parseInt(document.getElementById('f-stok').value),
                 satuan: document.getElementById('f-satuan').value,
                 harga_ecer: parseInt(document.getElementById('f-ecer').value),
@@ -271,7 +393,7 @@
                 closeModal();
                 await fetchBarang();
             } else {
-                alert("Gagal menyimpan data!");
+                alert("Gagal menyimpan data! Pastikan kolom terisi benar.");
             }
         }
 
@@ -279,6 +401,7 @@
             const b = masterBarang.find(x => x.id === id);
             document.getElementById('f-id').value = b.id;
             document.getElementById('f-nama').value = b.nama;
+            document.getElementById('f-barcode').value = b.barcode || "";
             document.getElementById('f-stok').value = b.stok;
             document.getElementById('f-satuan').value = b.satuan;
             document.getElementById('f-ecer').value = b.harga_ecer;
@@ -296,13 +419,19 @@
         }
 
         function openModal() { document.getElementById('modal-barang').classList.remove('hidden'); }
-        function closeModal() { 
+        async function closeModal() { 
             document.getElementById('modal-barang').classList.add('hidden');
             document.getElementById('form-master').reset();
             document.getElementById('f-id').value = "";
+            // Matikan scanner jika masih menyala saat tutup modal
+            if (html5QrCodeModal) {
+                await html5QrCodeModal.stop();
+                html5QrCodeModal = null;
+                document.getElementById('modal-scanner-container').classList.add('hidden');
+            }
         }
 
-        // KASIR & BLUETOOTH (Existing functions)
+        // KASIR & BLUETOOTH
         async function connectBluetooth() {
             try {
                 const device = await navigator.bluetooth.requestDevice({
@@ -313,7 +442,7 @@
                 const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
                 const characteristics = await service.getCharacteristics();
                 bluetoothCharacteristic = characteristics[0];
-                document.getElementById('btn-connect-printer').innerText = "✅ BT Terhubung";
+                document.getElementById('btn-connect-printer').innerText = "✅ BT Aktif";
                 document.getElementById('btn-connect-printer').classList.replace('bg-emerald-500', 'bg-indigo-500');
             } catch (err) { alert("Bluetooth gagal terhubung."); }
         }
@@ -360,7 +489,10 @@
                         <p class="text-[9px] font-black text-slate-300 uppercase mb-1">${b.satuan}</p>
                         <h3 class="font-bold text-slate-800 truncate">${b.nama}</h3>
                         <p class="${modeColor} font-black text-lg">Rp ${Number(hargaTampil).toLocaleString()}</p>
-                        <span class="text-[9px] font-black px-2 py-1 rounded-lg bg-slate-50">Stok: ${b.stok}</span>
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-[9px] font-black px-2 py-1 rounded-lg bg-slate-50">Stok: ${b.stok}</span>
+                            ${b.barcode ? '<span class="text-[10px] opacity-20">🏷️</span>' : ''}
+                        </div>
                     </div>
                 `;
             });
@@ -387,7 +519,7 @@
                 const sub = harga * item.qty;
                 totalHarga += sub;
                 list.innerHTML += `
-                    <div class="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex justify-between items-center">
+                    <div class="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex justify-between items-center animate-in slide-in-from-right-4 duration-200">
                         <div>
                             <p class="font-bold text-slate-800 text-sm">${item.nama}</p>
                             <p class="text-[8px] font-black uppercase text-indigo-500">${item.tipe} x ${item.qty}</p>
@@ -418,7 +550,7 @@
                 if (!btSuccess) printReceiptLegacy(bayar);
                 clearCart();
                 await fetchBarang();
-            } catch (e) { alert("Gagal proses."); }
+            } catch (e) { alert("Gagal proses transaksi."); }
         }
 
         function printReceiptLegacy(bayar) {
@@ -442,8 +574,8 @@
         }
         function setPriceMode(mode) {
             currentPriceMode = mode;
-            document.getElementById('mode-ecer').className = mode === 'ecer' ? "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white shadow-md text-indigo-600 border border-slate-100" : "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600";
-            document.getElementById('mode-grosir').className = mode === 'grosir' ? "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white shadow-md text-amber-600 border border-slate-100" : "flex-1 md:w-32 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600";
+            document.getElementById('mode-ecer').className = mode === 'ecer' ? "flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white shadow-md text-indigo-600 border border-slate-100" : "flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600";
+            document.getElementById('mode-grosir').className = mode === 'grosir' ? "flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest bg-white shadow-md text-amber-600 border border-slate-100" : "flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-600";
             renderProduk();
         }
         function switchTab(tab) {
