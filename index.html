@@ -140,9 +140,14 @@
                                 <span class="text-blue-100 text-xs font-bold uppercase tracking-wider">Total Bayar</span>
                                 <span class="text-3xl font-black" id="grand-total">Rp 0</span>
                             </div>
-                            <button onclick="openPayment()" class="w-full bg-white text-blue-700 hover:bg-blue-50 py-4 rounded-2xl font-black shadow-xl transition active:scale-95 uppercase tracking-widest text-xs flex justify-center gap-2">
-                                <span>PROSES BAYAR</span>
-                            </button>
+                            <div class="flex gap-2">
+                                <button onclick="savePending()" class="flex-1 bg-yellow-500 text-white hover:bg-yellow-600 py-3 rounded-xl font-bold shadow-lg transition active:scale-95 text-[10px] uppercase tracking-wider">
+                                    Simpan (Pending)
+                                </button>
+                                <button onclick="openPayment()" class="flex-[2] bg-white text-blue-700 hover:bg-blue-50 py-3 rounded-xl font-black shadow-xl transition active:scale-95 uppercase tracking-widest text-[10px] flex justify-center items-center gap-1">
+                                    <span>Lunas & Cetak</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -158,7 +163,13 @@
                     <div class="overflow-x-auto max-h-[75vh] custom-scroll">
                         <table class="w-full text-left">
                             <thead class="bg-gray-50 text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100 sticky top-0 z-10">
-                                <tr><th class="p-5">Waktu</th><th class="p-5">Pelanggan</th><th class="p-5 text-right">Total</th><th class="p-5">Kasir</th><th class="p-5 text-center">Opsi</th></tr>
+                                <tr>
+                                    <th class="p-5">Waktu</th>
+                                    <th class="p-5">Pelanggan</th>
+                                    <th class="p-5">Status</th>
+                                    <th class="p-5 text-right">Total</th>
+                                    <th class="p-5 text-center">Opsi</th>
+                                </tr>
                             </thead>
                             <tbody id="history-table-body" class="text-xs divide-y divide-gray-50 font-medium text-gray-600"></tbody>
                         </table>
@@ -235,7 +246,7 @@
                         </div>
 
                         <div class="md:col-span-6 flex gap-3 pt-6 border-t mt-2">
-                            <button type="submit" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 transition flex-grow shadow-lg shadow-blue-200 uppercase tracking-widest text-xs">SIMPAN PRODUK</button>
+                            <button type="submit" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-blue-700 transition flex-grow uppercase text-xs">SIMPAN PRODUK</button>
                             <button type="button" onclick="resetForm()" class="bg-white border-2 border-gray-200 text-gray-600 px-8 py-4 rounded-2xl font-black hover:bg-gray-50 transition text-xs">BATAL</button>
                         </div>
                     </form>
@@ -307,7 +318,7 @@
     <div id="printable-area" class="hidden">
         <div style="text-align:center; margin-bottom: 10px; border-bottom: 2px dashed #000; padding-bottom: 5px;">
             <b style="font-size: 11pt;">LENSA TOKO</b><br>
-            <span style="font-size: 8pt;">Karanglewas</span><br>
+            <span style="font-size: 8pt;">Jl. Raya Grosir No. 12</span><br>
             ================================
         </div>
         
@@ -347,6 +358,7 @@
         let html5QrCode = null;
         let currentScannerMode = 'pos';
         let bluetoothCharacteristic = null;
+        let pendingDeletionId = null;
 
         function getHeaders() { return { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SESSION_TOKEN || SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation" }; }
 
@@ -424,9 +436,6 @@
                 const p = allProducts.find(x => x.id === item.id);
                 const price = p[`harga_${currentSaleMode}_${item.unitType}`];
                 // Kalau item manual (harga > 0), jangan update harga otomatis jika harga DB 0
-                // Tapi logika sebelumnya: "harga 0 = manual". 
-                // Di sini kita cek ulang apakah harga DB > 0. Jika iya, update.
-                // Jika harga DB 0, biarkan harga manual di keranjang tetap seperti input user.
                 if (price > 0) {
                     item.price = price;
                 }
@@ -563,7 +572,7 @@
         }
 
         function removeFromCart(idx) { cart.splice(idx, 1); updateCartUI(); }
-        function emptyCart() { if(confirm("Bersihkan?")) { cart = []; updateCartUI(); } }
+        function emptyCart() { if(confirm("Bersihkan?")) { cart = []; updateCartUI(); pendingDeletionId = null; } }
 
         function openPayment() {
             if (cart.length === 0) return;
@@ -582,20 +591,98 @@
             document.getElementById('btn-final').disabled = cash < totalBelanja;
         }
 
+        // FUNGSI SIMPAN PENDING
+        async function savePending() {
+            if(cart.length === 0) return alert("Keranjang kosong!");
+            if(!confirm("Simpan transaksi ini sebagai PENDING?")) return;
+            
+            const cust = document.getElementById('customer-name').value || "Umum";
+            try {
+                // Simpan dengan status 'pending'
+                const resTx = await fetch(`${SUPABASE_URL}/rest/v1/transaksi`, { 
+                    method: 'POST', 
+                    headers: getHeaders(), 
+                    body: JSON.stringify({ 
+                        total: totalBelanja, 
+                        nama_pelanggan: cust, 
+                        user_email: USER_EMAIL,
+                        status: 'pending' // Tambah status
+                    }) 
+                });
+                const txData = await resTx.json();
+                const txId = txData[0].id;
+
+                for (const item of cart) {
+                    await fetch(`${SUPABASE_URL}/rest/v1/transaksi_detail`, { 
+                        method: 'POST', 
+                        headers: getHeaders(), 
+                        body: JSON.stringify({ 
+                            transaksi_id: txId, 
+                            barang_id: item.id, 
+                            qty: item.qty, 
+                            harga: item.price, 
+                            satuan_digunakan: item.unitName 
+                        }) 
+                    });
+                    // Note: Stok TIDAK dipotong untuk pending, atau dipotong? 
+                    // Biasanya pending = booking = potong stok. Mari potong stok.
+                    const p = allProducts.find(x => x.id === item.id);
+                    await fetch(`${SUPABASE_URL}/rest/v1/barang?id=eq.${item.id}`, { 
+                        method: 'PATCH', 
+                        headers: getHeaders(), 
+                        body: JSON.stringify({ stok: p.stok - Math.ceil(item.qty) }) 
+                    });
+                }
+
+                alert("Transaksi Berhasil Disimpan (PENDING)");
+                cart = []; 
+                updateCartUI(); 
+                document.getElementById('customer-name').value = ""; 
+                getProducts(); 
+            } catch (err) {
+                console.error(err);
+                alert("Gagal menyimpan pending transaction. Pastikan kolom 'status' sudah ada di database.");
+            }
+        }
+
+        // FUNGSI BAYAR LUNAS
         async function processCheckout() {
             const btn = document.getElementById('btn-final'); btn.innerText = "MENYIMPAN..."; btn.disabled = true;
             try {
-                const resTx = await fetch(`${SUPABASE_URL}/rest/v1/transaksi`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ total: totalBelanja, nama_pelanggan: document.getElementById('customer-name').value || "Umum", user_email: USER_EMAIL }) });
-                const txData = await resTx.json(); const txId = txData[0].id;
+                // Simpan transaksi baru sebagai LUNAS
+                const cust = document.getElementById('customer-name').value || "Umum";
+                const resTx = await fetch(`${SUPABASE_URL}/rest/v1/transaksi`, { 
+                    method: 'POST', 
+                    headers: getHeaders(), 
+                    body: JSON.stringify({ 
+                        total: totalBelanja, 
+                        nama_pelanggan: cust, 
+                        user_email: USER_EMAIL,
+                        status: 'lunas' 
+                    }) 
+                });
+                const txData = await resTx.json();
+                const txId = txData[0].id;
+
                 for (const item of cart) {
                     await fetch(`${SUPABASE_URL}/rest/v1/transaksi_detail`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ transaksi_id: txId, barang_id: item.id, qty: item.qty, harga: item.price, satuan_digunakan: item.unitName }) });
-                    const p = allProducts.find(x => x.id === item.id);
-                    await fetch(`${SUPABASE_URL}/rest/v1/barang?id=eq.${item.id}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ stok: p.stok - Math.ceil(item.qty) }) });
+                    // Potong stok hanya jika ini BUKAN berasal dari pending yg sudah dipotong
+                    if (!pendingDeletionId) {
+                        const p = allProducts.find(x => x.id === item.id);
+                        await fetch(`${SUPABASE_URL}/rest/v1/barang?id=eq.${item.id}`, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ stok: p.stok - Math.ceil(item.qty) }) });
+                    }
                 }
+
+                // Jika ini adalah lanjutan dari pending, hapus transaksi pending yang lama
+                if (pendingDeletionId) {
+                    await fetch(`${SUPABASE_URL}/rest/v1/transaksi?id=eq.${pendingDeletionId}`, { method: 'DELETE', headers: getHeaders() });
+                    pendingDeletionId = null;
+                }
+
                 const cash = parseFloat(document.getElementById('cash-input').value);
-                const printInfo = { date: new Date().toLocaleString('id-ID'), kasir: USER_EMAIL.split('@')[0], customer: document.getElementById('customer-name').value || "Umum", total: totalBelanja, cash: cash, change: cash - totalBelanja, items: cart };
+                const printInfo = { date: new Date().toLocaleString('id-ID'), kasir: USER_EMAIL.split('@')[0], customer: cust, total: totalBelanja, cash: cash, change: cash - totalBelanja, items: cart };
                 
-                await printBluetooth(formatReceiptText(printInfo)) || window.print(); // Try BT first
+                await printBluetooth(formatReceiptText(printInfo)) || window.print();
                 
                 cart = []; updateCartUI(); closePayment(); document.getElementById('customer-name').value = ""; getProducts(); alert("Transaksi Berhasil!");
             } catch (err) { alert("Error: Transaksi gagal disimpan."); } finally { btn.innerText = "CETAK & SIMPAN"; btn.disabled = false; }
@@ -688,8 +775,81 @@
             }
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-
         function resetForm() { document.getElementById('product-form').reset(); document.getElementById('edit-id').value = ""; }
+
+        // HISTORY
+        async function getTransactions() {
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/transaksi?select=*&order=tanggal.desc`, { headers: getHeaders() });
+                const data = await res.json();
+                document.getElementById('history-table-body').innerHTML = data.map(tx => {
+                    const statusBadge = tx.status === 'pending' 
+                        ? `<span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-1 rounded font-bold">PENDING</span>`
+                        : `<span class="bg-green-100 text-green-800 text-[10px] px-2 py-1 rounded font-bold">LUNAS</span>`;
+                    
+                    const actionBtn = tx.status === 'pending'
+                        ? `<button onclick="loadPendingTransaction(${tx.id})" class="bg-blue-600 text-white px-3 py-1 rounded-xl text-xs font-bold hover:bg-blue-700">BAYAR</button>`
+                        : `<button onclick="viewTransactionDetail(${tx.id})" class="bg-white border-2 border-blue-500 text-blue-600 px-3 py-1 rounded-xl text-xs font-bold hover:bg-blue-50">DETAIL</button>`;
+
+                    return `<tr class="hover:bg-gray-50">
+                        <td class="p-5 font-bold">${new Date(tx.tanggal).toLocaleString()}</td>
+                        <td class="p-5">${tx.nama_pelanggan}</td>
+                        <td class="p-5">${statusBadge}</td>
+                        <td class="p-5 text-right font-black text-blue-600">Rp ${Number(tx.total).toLocaleString()}</td>
+                        <td class="p-5 text-center">${actionBtn}</td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {}
+        }
+
+        async function loadPendingTransaction(txId) {
+            // Muat transaksi pending kembali ke kasir
+            if(cart.length > 0 && !confirm("Keranjang akan dikosongkan untuk memuat transaksi pending. Lanjut?")) return;
+            
+            try {
+                const resDet = await fetch(`${SUPABASE_URL}/rest/v1/transaksi_detail?transaksi_id=eq.${txId}&select=*`, { headers: getHeaders() });
+                const items = await resDet.json();
+                
+                cart = [];
+                for(let item of items) {
+                    const p = allProducts.find(x => x.id === item.barang_id);
+                    if(p) {
+                        // Temukan unit type berdasarkan nama satuan (agak tricky tapi workable)
+                        let uType = 1;
+                        for(let i=1; i<=4; i++) { if(p[`satuan_${i}`] === item.satuan_digunakan) uType = i; }
+                        
+                        cart.push({
+                            id: p.id,
+                            nama: p.nama,
+                            qty: item.qty,
+                            price: item.harga,
+                            unitType: uType,
+                            unitName: item.satuan_digunakan
+                        });
+                    }
+                }
+                
+                // Ambil info nama pelanggan
+                const resTx = await fetch(`${SUPABASE_URL}/rest/v1/transaksi?id=eq.${txId}&select=nama_pelanggan`, { headers: getHeaders() });
+                const txData = await resTx.json();
+                if(txData.length > 0) document.getElementById('customer-name').value = txData[0].nama_pelanggan;
+
+                updateCartUI();
+                pendingDeletionId = txId; // Tandai ID ini untuk dihapus setelah bayar lunas
+                changeTab('pos');
+                alert("Transaksi pending dimuat. Silakan lanjutkan pembayaran.");
+            } catch(e) { console.error(e); alert("Gagal memuat transaksi."); }
+        }
+
+        async function viewTransactionDetail(txId) {
+            document.getElementById('history-modal').classList.remove('hidden');
+            const resTx = await fetch(`${SUPABASE_URL}/rest/v1/transaksi?id=eq.${txId}&select=*`, { headers: getHeaders() });
+            const tx = (await resTx.json())[0];
+            const resDet = await fetch(`${SUPABASE_URL}/rest/v1/transaksi_detail?transaksi_id=eq.${txId}&select=*`, { headers: getHeaders() });
+            const dets = await resDet.json();
+            document.getElementById('history-detail-content').innerHTML = dets.map(d => { const p = allProducts.find(x=>x.id===d.barang_id); return `<div class="flex justify-between border-b pb-2 mb-2"><div><div class="font-bold">${p?p.nama:'Unknown'}</div><div class="text-xs text-gray-500">${d.qty} ${d.satuan_digunakan} x ${d.harga}</div></div><div class="font-bold">Rp ${(d.qty*d.harga).toLocaleString()}</div></div>` }).join('');
+            document.getElementById('reprint-btn').onclick = () => alert("Gunakan fitur browser print untuk saat ini.");
+        }
 
         checkAuth();
     </script>
