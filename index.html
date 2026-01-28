@@ -559,52 +559,40 @@
         }
 
         function printReceipt(info) {
-<head>
-    <style>
-        /* --- COPY DARI SINI --- */
-        
-        /* Ini style agar tampilan struk di layar terlihat rapi (opsional) */
-        .receipt-container {
-            width: 100%;
-            max-width: 300px; /* Lebar struk di layar HP */
-            margin: 20px auto;
-            padding: 10px;
-            background: #fff;
-            border: 1px dashed #ccc;
-            font-family: 'Courier New', Courier, monospace;
+            document.getElementById('print-info').innerHTML = `Tgl  : ${info.date}<br>Kasir: ${info.kasir}<br>Plgn : ${info.customer}`;
+            document.getElementById('print-total').innerText = "Rp " + info.total.toLocaleString();
+            document.getElementById('print-cash').innerText = "Rp " + info.cash.toLocaleString();
+            document.getElementById('print-change').innerText = "Rp " + info.change.toLocaleString();
+            document.getElementById('print-items-table').innerHTML = info.items.map(item => `<tr><td colspan="2" style="padding-top: 5px;">${item.nama}</td></tr><tr><td style="color: #666;">${item.qty} ${item.unitName} x ${item.price.toLocaleString()}</td><td style="text-align: right;">${(item.price * item.qty).toLocaleString()}</td></tr>`).join('');
+            window.print();
         }
-
-        /* Ini bagian PENTING untuk Printer Thermal */
-        @media print {
-            /* Sembunyikan semua elemen website (menu, navbar, tombol, dll) */
-            body * {
-                visibility: hidden;
-            }
-
-            /* Tampilkan HANYA area struk */
-            #print-area, #print-area * {
-                visibility: visible;
-            }
-
-            /* Posisikan struk di pojok kiri atas kertas */
-            #print-area {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                margin: 0;
-                padding: 0;
-            }
-            
-            /* Hilangkan margin kertas bawaan browser */
-            @page {
-                size: auto;
-                margin: 0mm;
-            }
-        }
-        /* --- SAMPAI SINI --- */
-    </style>
-</head>
+@media print {
+    /* Mengatur ukuran kertas virtual menjadi 58mm */
+    @page { 
+        size: 58mm auto; 
+        margin: 0mm; 
+    }
+    
+    /* Menyembunyikan elemen lain */
+    body * { 
+        visibility: hidden; 
+    }
+    
+    /* Memunculkan hanya area struk */
+    #printable-area, #printable-area * { 
+        visibility: visible; 
+    }
+    
+    /* Mengatur posisi struk ke pojok kiri atas kertas */
+    #printable-area { 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        width: 100%; /* Mengikuti lebar kertas 58mm */
+        margin: 0;
+        padding: 0;
+    }
+}
         // HISTORY
         async function getTransactions() {
             const tbody = document.getElementById('history-table-body');
