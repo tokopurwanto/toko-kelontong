@@ -10,6 +10,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
         body { font-family: 'Plus+Jakarta+Sans', sans-serif; }
         
+        /* CSS KHUSUS PRINTER THERMAL 58MM */
         @media print {
             body > * { display: none !important; }
             #printable-area { 
@@ -40,7 +41,7 @@
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-    <!-- LOGIN -->
+    <!-- LOGIN SCREEN -->
     <div id="login-screen" class="fixed inset-0 bg-blue-700 z-[200] flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 space-y-6">
             <div class="text-center">
@@ -48,18 +49,27 @@
                 <p class="text-xs text-gray-500 font-bold uppercase tracking-widest">Akses Admin & Kasir</p>
             </div>
             <form id="login-form" class="space-y-4">
-                <input type="email" id="login-email" required class="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 font-bold text-gray-700" placeholder="admin@lensa.toko">
-                <input type="password" id="login-password" required class="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 font-bold" placeholder="••••••••">
-                <button type="submit" id="btn-login-submit" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-black hover:bg-blue-700 transition shadow-lg">MASUK</button>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Email</label>
+                    <input type="email" id="login-email" required class="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 transition font-bold text-gray-700" placeholder="admin@lensa.toko">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Password</label>
+                    <input type="password" id="login-password" required class="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 transition font-bold" placeholder="••••••••">
+                </div>
+                <button type="submit" id="btn-login-submit" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-black hover:bg-blue-700 transition shadow-lg shadow-blue-200">MASUK APLIKASI</button>
             </form>
             <div id="login-error" class="hidden text-center text-red-500 text-xs font-bold bg-red-50 p-3 rounded-xl border border-red-100"></div>
         </div>
     </div>
 
-    <!-- APP -->
+    <!-- MAIN APP -->
     <div id="main-app" class="hidden">
+        <!-- NAVBAR -->
         <nav class="bg-blue-600 text-white p-4 sticky top-0 z-50 shadow-lg flex justify-between items-center no-print">
-            <div class="flex items-center gap-2"><span class="font-black text-xl tracking-tighter uppercase">Lensa Toko</span></div>
+            <div class="flex items-center gap-2">
+                <span class="font-black text-xl tracking-tighter uppercase">Lensa Toko</span>
+            </div>
             <div class="flex gap-4 items-center">
                 <div class="flex bg-blue-800/50 rounded-xl p-1.5 shadow-inner backdrop-blur-sm">
                     <button onclick="changeTab('pos')" id="tab-pos-btn" class="tab-btn active px-5 py-2 rounded-lg text-xs font-bold transition">Kasir</button>
@@ -92,7 +102,7 @@
                                 </div>
                                 <button onclick="toggleScanner('pos')" class="flex items-center gap-2 bg-blue-50 text-blue-600 px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-blue-100 transition border border-blue-100 shadow-sm">SCAN</button>
                             </div>
-                            <div class="relative"><input type="text" id="search-input" placeholder="Cari nama / scan..." class="w-full pl-4 pr-4 py-4 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition shadow-inner bg-gray-50/50 text-sm font-medium" oninput="filterDisplay()"></div>
+                            <div class="relative"><input type="text" id="search-input" placeholder="Cari nama barang atau scan..." class="w-full pl-4 pr-4 py-4 rounded-2xl border border-gray-200 outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition shadow-inner bg-gray-50/50 text-sm font-medium" oninput="filterDisplay()"></div>
                         </div>
                         <div id="product-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto max-h-[65vh] custom-scroll p-1"></div>
                     </div>
@@ -291,12 +301,15 @@
             let finalPrice = basePrice;
             let finalQty = 1;
 
+            // LOGIKA BARANG FLEKSIBEL (Harga 0)
             if (basePrice === 0) {
                 let inputP = prompt(`Masukkan Harga Satuan untuk ${prod.nama} (${unitName}):`, "");
                 if (inputP === null) return; 
                 finalPrice = parseFloat(inputP);
                 if (isNaN(finalPrice) || finalPrice < 0) return alert("Harga tidak valid");
+                
                 // Qty default 1, tidak minta input
+                finalQty = 1;
             } else {
                 if (prod.stok <= 0) return alert("Stok habis!");
             }
@@ -388,7 +401,7 @@
                 const cash = parseFloat(document.getElementById('cash-input').value);
                 const printInfo = { date: new Date().toLocaleString('id-ID'), kasir: USER_EMAIL.split('@')[0], customer: document.getElementById('customer-name').value || "Umum", total: totalBelanja, cash: cash, change: cash - totalBelanja, items: cart };
                 
-                await printBluetooth(formatReceiptText(printInfo)) || window.print(); // Try BT first
+                await printBluetooth(formatReceiptText(printInfo)) || printReceipt(printInfo);
                 
                 cart = []; updateCartUI(); closePayment(); document.getElementById('customer-name').value = ""; getProducts(); alert("Transaksi Berhasil!");
             } catch (err) { alert("Error: " + err.message); } finally { btn.innerText = "CETAK & SIMPAN"; btn.disabled = false; }
@@ -399,7 +412,8 @@
             if(!confirm("Simpan transaksi ini sebagai PENDING?")) return;
             try {
                 const resTx = await fetch(`${SUPABASE_URL}/rest/v1/transaksi`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ total: totalBelanja, nama_pelanggan: document.getElementById('customer-name').value || "Umum", user_email: USER_EMAIL, status: 'pending' }) });
-                const txData = await resTx.json(); const txId = txData[0].id;
+                const txData = await resTx.json();
+                const txId = txData[0].id;
                 for (const item of cart) {
                     await fetch(`${SUPABASE_URL}/rest/v1/transaksi_detail`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ transaksi_id: txId, barang_id: item.id, qty: item.qty, harga: item.price, satuan_digunakan: item.unitName }) });
                     const p = allProducts.find(x => x.id === item.id);
@@ -448,7 +462,21 @@
             const resDet = await fetch(`${SUPABASE_URL}/rest/v1/transaksi_detail?transaksi_id=eq.${txId}&select=*`, { headers: getHeaders() });
             const dets = await resDet.json();
             document.getElementById('history-detail-content').innerHTML = dets.map(d => { const p = allProducts.find(x=>x.id===d.barang_id); return `<div class="flex justify-between border-b pb-2 mb-2"><div><div class="font-bold">${p?p.nama:'Unknown'}</div><div class="text-xs text-gray-500">${d.qty} ${d.satuan_digunakan} x ${d.harga}</div></div><div class="font-bold">Rp ${(d.qty*d.harga).toLocaleString()}</div></div>` }).join('');
-            document.getElementById('reprint-btn').onclick = () => window.print();
+            document.getElementById('reprint-btn').onclick = () => {
+                const printInfo = { 
+                    date: new Date(tx.tanggal).toLocaleString('id-ID'), 
+                    kasir: tx.user_email?.split('@')[0], 
+                    customer: tx.nama_pelanggan, 
+                    total: tx.total, 
+                    cash: 0, 
+                    change: 0, 
+                    items: dets.map(d => { 
+                        const p = allProducts.find(x => x.id === d.barang_id); 
+                        return { nama: p ? p.nama : 'Unknown', qty: d.qty, unitName: d.satuan_digunakan, price: d.harga }; 
+                    }) 
+                };
+                printReceipt(printInfo);
+            };
         }
 
         // ... Scanner & Inventory functions ...
@@ -456,13 +484,51 @@
         function startScanner(){if(html5QrCode)html5QrCode.clear();html5QrCode=new Html5Qrcode("reader");html5QrCode.start({facingMode:"environment"},{fps:15,qrbox:250},(decodedText)=>{if(currentScannerMode==='pos'){const p=allProducts.find(x=>x.barcode===decodedText);if(p){addToCart(p.id);if(navigator.vibrate)navigator.vibrate(100);}}else{document.getElementById('p-barcode').value=decodedText;if(navigator.vibrate)navigator.vibrate(100);toggleScanner('inventory');}}).catch(e=>{console.error(e);document.getElementById('scanner-container').classList.add('hidden');});}
         function stopScanner(){if(html5QrCode){html5QrCode.stop().then(()=>{html5QrCode.clear();html5QrCode=null;}).catch(()=>{html5QrCode=null;});}}
         async function connectBluetoothPrinter(){if(!navigator.bluetooth)return alert("Browser tidak support BT");try{const device=await navigator.bluetooth.requestDevice({filters:[{services:['000018f0-0000-1000-8000-00805f9b34fb']}]});const server=await device.gatt.connect();const service=await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');const characteristics=await service.getCharacteristics();for(const c of characteristics){if(c.properties.write||c.properties.writeWithoutResponse){bluetoothCharacteristic=c;break;}}if(bluetoothCharacteristic)alert("Printer Terhubung!");}catch(error){alert("Gagal konek BT");}}
-        async function printBluetooth(text){if(!bluetoothCharacteristic)return false;try{const encoder=new TextEncoder();const ESC="\x1B",GS="\x1D",INIT=ESC+"@",CENTER=ESC+"a"+"\x01",LEFT=ESC+"a"+"\x00",CUT=GS+"V"+"\x41"+"\x00";const data=INIT+CENTER+"LENSA TOKO\n\n"+LEFT+text+"\n\n"+CENTER+"Terima Kasih\n\n"+CUT;const buffer=encoder.encode(data);const chunkSize=100;for(let i=0;i<buffer.byteLength;i+=chunkSize){await bluetoothCharacteristic.writeValue(buffer.slice(i,i+chunkSize));await new Promise(r=>setTimeout(r,20));}return true;}catch{return false;}}
+        async function printBluetooth(text){if(!bluetoothCharacteristic)return false;try{const encoder=new TextEncoder();const ESC="\x1B",GS="\x1D",INIT=ESC+"@",CENTER=ESC+"a"+"\x01",LEFT=ESC+"a"+"\x00",CUT=GS+"V"+"\x41"+"\x00";const data=INIT+CENTER+"LENSA TOKO\n\n"+LEFT+text+"\n\n"+CENTER+"Terima Kasih\n\n"+CUT;await bluetoothCharacteristic.writeValue(encoder.encode(data));return true;}catch{return false;}}
         function formatReceiptText(info){let t=`Tgl: ${info.date}\nKasir: ${info.kasir}\nPlgn: ${info.customer}\n----------------\n`;info.items.forEach(i=>t+=`${i.nama.substring(0,15)} ${i.qty}${i.unitName}\nRp ${(i.qty*i.price).toLocaleString()}\n`);t+=`----------------\nTotal: Rp ${info.total.toLocaleString()}\nTunai: Rp ${info.cash.toLocaleString()}\nKembali: Rp ${info.change.toLocaleString()}\n`;return t;}
         function filterInventory(){const term=document.getElementById('inventory-search').value.toLowerCase();const filtered=allProducts.filter(p=>p.nama.toLowerCase().includes(term)||(p.barcode&&p.barcode.includes(term)));renderInventoryTable(filtered);}
         document.getElementById('product-form').onsubmit=async(e)=>{e.preventDefault();const id=document.getElementById('edit-id').value;const newName=document.getElementById('p-nama').value.trim();const newBarcode=document.getElementById('p-barcode').value.trim();if(!id){const exists=allProducts.find(p=>p.nama.toLowerCase()===newName.toLowerCase()||(newBarcode&&p.barcode===newBarcode));if(exists)return alert("Duplikat!");}const barcodeVal=newBarcode===""?null:newBarcode;const data={nama:newName,barcode:barcodeVal,stok:parseInt(document.getElementById('p-stok').value)};for(let i=1;i<=4;i++){data[`satuan_${i}`]=document.getElementById(`p-satuan-${i}`).value||null;data[`harga_ecer_${i}`]=parseFloat(document.getElementById(`p-ecer-${i}`).value)||0;data[`harga_grosir_${i}`]=parseFloat(document.getElementById(`p-grosir-${i}`).value)||0;}const method=id?'PATCH':'POST';const url=id?`${SUPABASE_URL}/rest/v1/barang?id=eq.${id}`:`${SUPABASE_URL}/rest/v1/barang`;const res=await fetch(url,{method,headers:getHeaders(),body:JSON.stringify(data)});if(res.ok){resetForm();await getProducts();alert("Tersimpan!");}else{alert("Gagal/Duplikat");}};
         function renderInventoryTable(items=allProducts){const tbody=document.getElementById('inventory-table-body');if(items.length===0){tbody.innerHTML=`<tr><td colspan="4" class="p-5 text-center text-gray-400">Kosong</td></tr>`;return;}tbody.innerHTML=items.map(p=>`<tr class="hover:bg-blue-50/30 transition"><td class="p-5"><div class="font-bold text-gray-800">${p.nama}</div><div class="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">${p.barcode||'-'}</div></td><td class="p-5 text-center font-black text-blue-600">${p.stok}</td><td class="p-5"><div class="font-black text-gray-700">${p.satuan_1}</div><div class="text-[9px] text-gray-400">E: ${Number(p.harga_ecer_1).toLocaleString()}</div></td><td class="p-5 text-center"><button onclick="editItem(${p.id})" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black hover:bg-blue-700 transition">EDIT</button></td></tr>`).join('');}
         function editItem(id){const p=allProducts.find(x=>x.id===id);document.getElementById('edit-id').value=p.id;document.getElementById('p-nama').value=p.nama;document.getElementById('p-barcode').value=p.barcode||"";document.getElementById('p-stok').value=p.stok;for(let i=1;i<=4;i++){document.getElementById(`p-satuan-${i}`).value=p[`satuan_${i}`]||"";document.getElementById(`p-ecer-${i}`).value=p[`harga_ecer_${i}`]||0;document.getElementById(`p-grosir-${i}`).value=p[`harga_grosir_${i}`]||0;}window.scrollTo({top:0,behavior:'smooth'});}
         function resetForm(){document.getElementById('product-form').reset();document.getElementById('edit-id').value="";}
+        
+        function printReceipt(info) {
+            document.getElementById('print-info').innerHTML = `
+                Tgl  : ${info.date}<br>
+                Kasir: ${info.kasir}<br>
+                Kepada Yth.<br>
+                ${info.customer}
+            `;
+            
+            document.getElementById('print-items-table').innerHTML = info.items.map(item => {
+                const totalLine = (item.price * item.qty);
+                const priceFmt = Number(item.price).toLocaleString('id-ID');
+                const totalFmt = Number(totalLine).toLocaleString('id-ID');
+                
+                return `
+                <tr>
+                    <td colspan="2" style="padding-top: 2px; font-weight: normal; text-transform: uppercase;">${item.nama}</td>
+                </tr>
+                <tr style="border-bottom: 0px;">
+                    <td style="padding-bottom: 4px; font-size: 9pt;">
+                        ${item.qty} ${item.unitName} xRp. ${priceFmt}
+                    </td>
+                    <td style="text-align: right; padding-bottom: 4px; font-size: 9pt;">
+                        = Rp. ${totalFmt}
+                    </td>
+                </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('print-total').innerText = "Rp. " + Number(info.total).toLocaleString('id-ID');
+            document.getElementById('print-cash').innerText = "Rp. " + Number(info.cash).toLocaleString('id-ID');
+            document.getElementById('print-change').innerText = "Rp. " + Number(info.change).toLocaleString('id-ID');
+
+            // Force a small delay to ensure DOM update before print dialog
+            setTimeout(() => {
+                window.print();
+            }, 300);
+        }
 
         checkAuth();
     </script>
