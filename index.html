@@ -109,7 +109,13 @@
 
                     <div class="bg-white rounded-3xl shadow-xl flex flex-col h-[calc(100vh-140px)] sticky top-24 border border-gray-100 overflow-hidden">
                         <div class="p-5 border-b space-y-4 bg-gray-50/80 backdrop-blur">
-                            <div class="flex justify-between items-center"><h2 class="font-black text-gray-800 text-xs uppercase tracking-widest">Keranjang</h2><button onclick="emptyCart()" class="text-[10px] font-black text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg transition">KOSONGKAN</button></div>
+                            <div class="flex justify-between items-center">
+                                <h2 class="font-black text-gray-800 text-xs uppercase tracking-widest">Keranjang</h2>
+                                <div class="flex gap-1">
+                                    <button onclick="showPendingModal()" class="text-[9px] font-black text-yellow-600 hover:bg-yellow-100 px-3 py-1.5 rounded-lg transition bg-yellow-50 border border-yellow-200">AMBIL PENDING</button>
+                                    <button onclick="emptyCart()" class="text-[9px] font-black text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg transition bg-red-50 border border-red-100">RESET</button>
+                                </div>
+                            </div>
                             <input type="text" id="customer-name" placeholder="Nama Pelanggan (Umum)" class="w-full text-xs px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-blue-500 bg-white shadow-sm transition">
                         </div>
                         <div id="cart-list" class="flex-grow overflow-y-auto p-5 space-y-4 custom-scroll"><div class="text-center text-gray-300 mt-20 flex flex-col items-center opacity-50"><p class="text-sm font-bold">Keranjang Kosong</p></div></div>
@@ -190,6 +196,20 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                     CETAK SEKARANG
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PENDING LIST -->
+    <div id="pending-modal" class="fixed inset-0 bg-black/80 hidden z-[400] flex items-center justify-center p-4 backdrop-blur-md">
+        <div class="bg-white rounded-[2rem] w-full max-w-lg p-6 space-y-4 shadow-2xl h-[70vh] flex flex-col">
+            <div class="flex justify-between items-center pb-2 border-b">
+                <h3 class="font-black text-xl text-gray-800">Daftar Transaksi Pending</h3>
+                <button onclick="document.getElementById('pending-modal').classList.add('hidden')" class="bg-gray-100 p-2 rounded-full hover:bg-gray-200">✕</button>
+            </div>
+            <div id="pending-list-content" class="flex-grow overflow-y-auto custom-scroll space-y-2"></div>
+            <div class="pt-2 border-t">
+                <button onclick="document.getElementById('pending-modal').classList.add('hidden')" class="w-full py-3 font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition text-xs uppercase">Tutup</button>
             </div>
         </div>
     </div>
@@ -424,15 +444,12 @@
                     items: [...cart] // copy cart
                 };
                 
-                // Set global var for preview
                 currentPrintInfo = printInfo;
 
-                // Clear & Reset UI immediately
                 cart = []; updateCartUI(); closePayment(); 
                 document.getElementById('customer-name').value = ""; 
                 getProducts(); 
 
-                // Show Preview Modal
                 showPreviewModal(printInfo);
 
             } catch (err) { alert("Error: " + err.message); btn.innerText = "SIMPAN"; btn.disabled = false; }
@@ -477,19 +494,16 @@
                 </div>
             `;
             
-            // Setup Print Button
             document.getElementById('btn-print-confirm').onclick = async () => {
                 const text = formatReceiptText(info);
                 let printed = false;
                 
-                // Try Bluetooth First
                 if (bluetoothCharacteristic) {
                     try {
                         printed = await printBluetooth(text);
                     } catch(e) { console.error("BT Print Fail", e); }
                 }
 
-                // If BT not connected or failed, use browser print
                 if (!printed) {
                     printReceipt(info);
                 }
@@ -502,7 +516,6 @@
 
         function closePreview() {
             document.getElementById('preview-modal').classList.add('hidden');
-            // Ensure UI is clean
             document.getElementById('btn-final').innerText = "SIMPAN";
             document.getElementById('btn-final').disabled = false;
         }
@@ -516,7 +529,7 @@
             return t;
         }
         
-        // Print Browser (Generate hidden table and print)
+        // Print Browser
         function printReceipt(info) {
             document.getElementById('print-info').innerHTML = `
                 Tgl  : ${info.date}<br>
@@ -524,17 +537,34 @@
                 Kepada Yth.<br>
                 ${info.customer}
             `;
-            document.getElementById('print-items-table').innerHTML = info.items.map(item => `
-                <tr><td colspan="2" style="padding-top: 2px; font-weight: normal; text-transform: uppercase;">${item.nama}</td></tr>
-                <tr style="border-bottom: 0px;">
-                    <td style="padding-bottom: 4px; font-size: 9pt;">${item.qty} ${item.unitName} xRp. ${Number(item.price).toLocaleString()}</td>
-                    <td style="text-align: right; padding-bottom: 4px; font-size: 9pt;">= Rp. ${Number(item.qty*item.price).toLocaleString()}</td>
+            
+            document.getElementById('print-items-table').innerHTML = info.items.map(item => {
+                const totalLine = (item.price * item.qty);
+                const priceFmt = Number(item.price).toLocaleString('id-ID');
+                const totalFmt = Number(totalLine).toLocaleString('id-ID');
+                
+                return `
+                <tr>
+                    <td colspan="2" style="padding-top: 2px; font-weight: normal; text-transform: uppercase;">${item.nama}</td>
                 </tr>
-            `).join('');
-            document.getElementById('print-total').innerText = "Rp. " + Number(info.total).toLocaleString();
-            document.getElementById('print-cash').innerText = "Rp. " + Number(info.cash).toLocaleString();
-            document.getElementById('print-change').innerText = "Rp. " + Number(info.change).toLocaleString();
-            setTimeout(() => window.print(), 300);
+                <tr style="border-bottom: 0px;">
+                    <td style="padding-bottom: 4px; font-size: 9pt;">
+                        ${item.qty} ${item.unitName} @${priceFmt}
+                    </td>
+                    <td style="text-align: right; padding-bottom: 4px; font-size: 9pt;">
+                        = Rp. ${totalFmt}
+                    </td>
+                </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('print-total').innerText = "Rp. " + Number(info.total).toLocaleString('id-ID');
+            document.getElementById('print-cash').innerText = "Rp. " + Number(info.cash).toLocaleString('id-ID');
+            document.getElementById('print-change').innerText = "Rp. " + Number(info.change).toLocaleString('id-ID');
+
+            setTimeout(() => {
+                window.print();
+            }, 300);
         }
 
         // ... Other existing functions ...
@@ -546,6 +576,38 @@
         function editItem(id){const p=allProducts.find(x=>x.id===id);document.getElementById('edit-id').value=p.id;document.getElementById('p-nama').value=p.nama;document.getElementById('p-barcode').value=p.barcode||"";document.getElementById('p-stok').value=p.stok;for(let i=1;i<=4;i++){document.getElementById(`p-satuan-${i}`).value=p[`satuan_${i}`]||"";document.getElementById(`p-ecer-${i}`).value=p[`harga_ecer_${i}`]||0;document.getElementById(`p-grosir-${i}`).value=p[`harga_grosir_${i}`]||0;}window.scrollTo({top:0,behavior:'smooth'});}
         function resetForm(){document.getElementById('product-form').reset();document.getElementById('edit-id').value="";}
         async function savePending() { if(cart.length===0)return alert("Kosong"); if(!confirm("Simpan Pending?"))return; try{ const res=await fetch(`${SUPABASE_URL}/rest/v1/transaksi`,{method:'POST',headers:getHeaders(),body:JSON.stringify({total:totalBelanja,nama_pelanggan:document.getElementById('customer-name').value||"Umum",user_email:USER_EMAIL,status:'pending'})}); const d=await res.json(); const id=d[0].id; for(const i of cart){ await fetch(`${SUPABASE_URL}/rest/v1/transaksi_detail`,{method:'POST',headers:getHeaders(),body:JSON.stringify({transaksi_id:id,barang_id:i.id,qty:i.qty,harga:i.price,satuan_digunakan:i.unitName})}); const p=allProducts.find(x=>x.id===i.id); if(p) await fetch(`${SUPABASE_URL}/rest/v1/barang?id=eq.${i.id}`,{method:'PATCH',headers:getHeaders(),body:JSON.stringify({stok:p.stok-Math.ceil(i.qty)})}); } alert("Tersimpan (PENDING)"); cart=[]; updateCartUI(); getProducts(); } catch(e){alert("Gagal");} }
+
+        // --- PENDING MODAL SHOW ---
+        async function showPendingModal() {
+            const content = document.getElementById('pending-list-content');
+            content.innerHTML = `<div class="p-10 text-center animate-pulse">Memuat...</div>`;
+            document.getElementById('pending-modal').classList.remove('hidden');
+            
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/transaksi?status=eq.pending&select=*&order=tanggal.desc`, { headers: getHeaders() });
+                const data = await res.json();
+                
+                if(data.length === 0) {
+                    content.innerHTML = `<div class="p-10 text-center text-gray-400">Tidak ada transaksi pending</div>`;
+                    return;
+                }
+
+                content.innerHTML = data.map(tx => `
+                    <div class="bg-yellow-50 p-4 rounded-2xl border border-yellow-100 flex justify-between items-center">
+                        <div>
+                            <div class="font-bold text-gray-800">${tx.nama_pelanggan || 'Tanpa Nama'}</div>
+                            <div class="text-xs text-gray-500">${new Date(tx.tanggal).toLocaleString()}</div>
+                            <div class="font-black text-blue-600 mt-1">Rp ${Number(tx.total).toLocaleString()}</div>
+                        </div>
+                        <button onclick="loadPendingTransaction(${tx.id}); document.getElementById('pending-modal').classList.add('hidden');" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 shadow-lg shadow-blue-200">
+                            LANJUT
+                        </button>
+                    </div>
+                `).join('');
+            } catch(e) {
+                content.innerHTML = `<div class="p-10 text-center text-red-500">Gagal memuat data</div>`;
+            }
+        }
 
         checkAuth();
     </script>
